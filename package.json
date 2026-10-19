@@ -1,0 +1,12 @@
+{
+  "name": "novel",
+  "version": "0.1.0",
+  "description": "歩数でテンポが変わる、AI API不要の短編小説生成エンジン",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "report": "node scripts/report.js",
+    "serve": "python3 -m http.server 8000"
+  }
+}

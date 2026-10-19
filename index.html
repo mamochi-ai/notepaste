@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3分小説 実験画面</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>3分小説生成エンジン <small>Ver.0.1 実験画面</small></h1>
+  </header>
+
+  <main>
+    <form id="controls" class="panel">
+      <label>今日の歩数
+        <input id="steps" type="number" inputmode="numeric" min="0" max="100000" step="1" value="5000" required>
+      </label>
+      <label>ジャンル
+        <select id="genre"><option value="">自動で選ぶ</option></select>
+      </label>
+      <label>シード <span class="hint">空欄ならランダム。同じシードのまま歩数を変えると、同じ物語のテンポだけが変わります</span>
+        <input id="seed" type="text" autocomplete="off" placeholder="例: 2026-10-19">
+      </label>
+      <div class="buttons">
+        <button id="generate" type="submit">物語を生成</button>
+        <button id="regenerate" type="button" disabled>再生成</button>
+        <button id="save" type="button" disabled>テキストで保存</button>
+      </div>
+      <p id="tempo" class="hint" aria-live="polite"></p>
+    </form>
+
+    <article id="story" class="panel" hidden>
+      <h2 id="title"></h2>
+      <p id="stats" class="stats"></p>
+      <div id="body" class="body"></div>
+    </article>
+
+    <details id="settings" class="panel" hidden>
+      <summary>生成に使用した設定を確認する</summary>
+      <div id="settings-body"></div>
+    </details>
+
+    <p id="error" class="error" role="alert" hidden></p>
+  </main>
+
+  <script type="module" src="src/ui/app.js"></script>
+</body>
+</html>
