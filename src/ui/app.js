@@ -6,7 +6,7 @@ import { DATA } from '../data/index.js';
 const $ = (id) => document.getElementById(id);
 const els = {
   form: $('controls'), steps: $('steps'), genre: $('genre'), seed: $('seed'),
-  regenerate: $('regenerate'), save: $('save'), tempo: $('tempo'),
+  regenerate: $('regenerate'), save: $('save'), copy: $('copy'), tempo: $('tempo'),
   story: $('story'), title: $('title'), stats: $('stats'), body: $('body'),
   settings: $('settings'), settingsBody: $('settings-body'), error: $('error'),
 };
@@ -64,7 +64,7 @@ function render(story) {
   els.story.hidden = false;
   els.settings.hidden = false;
   els.regenerate.disabled = false;
-  els.save.disabled = false;
+  for (const b of [els.save, els.copy]) if (b) b.disabled = false;
 }
 
 function settingsTable(story) {
@@ -118,8 +118,7 @@ function settingsTable(story) {
   return table;
 }
 
-function save() {
-  if (!current) return;
+function exportText() {
   const m = current.meta;
   const footer = [
     '',
@@ -127,7 +126,13 @@ function save() {
     `歩数: ${m.steps} / テンポ: ${m.tempo.label} / ジャンル: ${m.genre} / テーマ: ${m.theme}`,
     `シード: ${m.seed} / 骨格: ${m.skeleton} / 結末: ${m.ending} / ${current.charCount}字`,
   ].join('\n');
-  const blob = new Blob([`${current.text}${footer}\n`], { type: 'text/plain;charset=utf-8' });
+  return `${current.text}${footer}\n`;
+}
+
+function save() {
+  if (!current) return;
+  const m = current.meta;
+  const blob = new Blob([exportText()], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   // 日本語のファイル名は一部のブラウザで無視されるため ASCII にする（題名は本文の先頭にある）
@@ -143,7 +148,19 @@ els.form.addEventListener('submit', (e) => {
   run(els.seed.value.trim() || randomSeed());
 });
 els.regenerate.addEventListener('click', () => run(randomSeed()));
-els.save.addEventListener('click', save);
+els.save?.addEventListener('click', save);
+// 保存（ダウンロード）が使えない環境向けに、本文をクリップボードへコピーする
+els.copy?.addEventListener('click', async () => {
+  if (!current) return;
+  try {
+    await navigator.clipboard.writeText(exportText());
+    els.copy.textContent = 'コピーしました';
+  } catch {
+    els.copy.textContent = 'コピーできませんでした';
+  }
+  setTimeout(() => (els.copy.textContent = 'テキストをコピー'), 2000);
+});
 els.steps.addEventListener('input', showTempo);
 showTempo();
-if (params.has('seed')) run(els.seed.value);
+// 開いた直後から1編読めるようにする
+run(els.seed.value.trim() || randomSeed());
