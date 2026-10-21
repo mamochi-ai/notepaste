@@ -4,116 +4,135 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="Markdown記事を装飾付きのままnoteへ貼り付けるための検証ツール（プロトタイプ）">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="description" content="AIが書いたMarkdown記事を、見出し・太字・リストを保ったままnoteに貼り付けるためのツール">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Paste Studio">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1f2220" media="(prefers-color-scheme: dark)">
 <title>note Paste Studio</title>
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="css/style.css">
 <script type="module" src="js/editor.js"></script>
 </head>
-<body>
+<body class="editor-page">
 <header class="topbar">
   <div class="brand">
     <span class="brand-mark" aria-hidden="true"></span>
     <span class="brand-name">note Paste Studio</span>
-    <span class="badge">プロトタイプ</span>
   </div>
-  <nav class="tabs" aria-label="画面切り替え">
-    <a href="./" aria-current="page">エディタ</a>
-    <a href="test.html">検証テスト</a>
-  </nav>
-  <button type="button" class="btn-ghost theme-btn" id="themeToggle"><span>自動</span></button>
+  <div class="topbar-actions">
+    <button type="button" class="btn-ghost" id="helpToggle" aria-expanded="false" aria-controls="help">使い方</button>
+    <button type="button" class="btn-ghost theme-btn" id="themeToggle"><span>自動</span></button>
+  </div>
 </header>
+
+<section class="help" id="help" hidden aria-label="使い方">
+  <ol>
+    <li><strong>貼り付け</strong>：ChatGPTやClaudeの回答をコピーして、「AIの回答を貼り付け」を押します（または入力欄に直接貼り付け）。</li>
+    <li><strong>画像を入れる</strong>：入力欄で画像を入れたい位置をタップし、「画像を追加」を押します。</li>
+    <li><strong>noteへ</strong>：「noteに貼り付ける」の①〜③の順にコピーして、noteの編集画面に貼り付けます。<br>本文の「［画像1：…］」の目印の位置に、画像を1枚ずつ貼り付けて、目印の文字を消してください。</li>
+  </ol>
+  <p class="hint">画像は、noteの仕様上、本文と一緒には貼り付けられません（検証済み）。記事と画像はこの端末の中だけで処理され、外部には送信されません。</p>
+</section>
 
 <main class="workspace">
   <section class="pane pane-input" aria-labelledby="inputTitle">
     <div class="pane-head">
-      <h2 id="inputTitle">Markdown</h2>
+      <h2 id="inputTitle">記事</h2>
       <div class="toolbar">
+        <button type="button" class="btn" id="pasteFromClipboard">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4.5V3h6v1.5M9 10h6M9 14h6" /></svg>
+          AIの回答を貼り付け
+        </button>
         <label class="btn" for="fileInput">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z M4 15l4-4 4 4 3-3 5 5" /><circle cx="15.5" cy="9" r="1.5" /></svg>
           画像を追加
         </label>
         <input type="file" id="fileInput" accept="image/*" multiple class="visually-hidden">
-        <button type="button" class="btn" id="loadSample">サンプル</button>
-        <button type="button" class="btn" id="clearText">消去</button>
+        <button type="button" class="btn" id="newArticle">新規</button>
       </div>
     </div>
-    <p class="hint">ChatGPTやClaudeの回答を「コピー」して、ここに貼り付けてください。画像は、入力欄でタップした位置に挿入されます。</p>
-    <textarea id="md" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Markdown入力欄"></textarea>
+    <textarea id="md" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Markdown入力欄" placeholder="ここにAIが書いたMarkdownの記事を貼り付けます"></textarea>
     <div class="statusline"><span id="charCount">0 文字</span><span id="saveState"></span></div>
 
-    <section class="images" aria-labelledby="imagesTitle">
+    <section class="images" aria-labelledby="imagesTitle" id="imagesSection">
       <div class="section-head">
         <h3 id="imagesTitle">画像</h3>
         <span class="muted" id="imageSummary"></span>
       </div>
-      <p class="hint">画像はこの端末のブラウザ内にだけ保存され、外部には送信されません。長辺1600pxを超える画像は縮小します。</p>
       <ul class="image-list" id="imageList"></ul>
     </section>
   </section>
 
   <section class="pane pane-output" aria-labelledby="outputTitle">
-    <div class="copy-panel">
-      <h2 id="outputTitle" class="visually-hidden">コピーとプレビュー</h2>
-      <button type="button" class="btn-primary" id="copyRich">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></svg>
-        装飾付きコピー
-      </button>
-      <div class="options">
-        <label class="field">
-          <span>画像の扱い</span>
-          <select id="imageMode">
-            <option value="none">画像は目印にして後から貼る（おすすめ）</option>
-            <option value="dataurl">検証用：data URLで埋め込む</option>
-            <option value="https">検証用：公開HTTPS URL（テスト画像のみ）</option>
-            <option value="bloburl">検証用：Blob URL</option>
-          </select>
-        </label>
-        <p class="hint" id="modeHint" hidden>iPad Safari＋noteの検証では、画像を含むHTMLは貼り付けできませんでした。通常は「目印にして後から貼る」を使ってください。</p>
-        <label class="check"><input type="checkbox" id="extractTitle" checked> 最初のH1を記事タイトルとして分ける</label>
-        <label class="check"><input type="checkbox" id="noteHeadings" checked> 見出しをnoteの大見出し・小見出しに合わせる</label>
-      </div>
-      <button type="button" class="btn wide" id="copyTitle" hidden>タイトルだけコピー</button>
-      <div id="copyResult" class="result" hidden aria-live="polite"></div>
-
-      <section class="image-steps" id="imageSteps" hidden aria-labelledby="stepsTitle">
-        <div class="section-head">
-          <h3 id="stepsTitle">画像を順番に貼る</h3>
-          <span class="muted" id="stepCount"></span>
-        </div>
-        <p class="hint">本文を貼り付けたあと、ボタンで画像を1枚ずつコピーし、noteの「［画像1：…］」などの目印の位置に貼り付けてください。貼り付けたら目印の文字は消してください。</p>
-        <p class="step-done" id="stepDone" hidden role="status"></p>
-        <div class="step-card">
-          <img id="stepThumb" alt="" width="64" height="64" hidden>
-          <div class="step-info">
-            <strong id="stepLabel"></strong>
-            <span class="muted" id="stepNote"></span>
+    <div class="copy-panel" id="copyPanel">
+      <h2 id="outputTitle" class="panel-title">noteに貼り付ける</h2>
+      <ol class="flow">
+        <li class="flow-step" id="titleStep" hidden>
+          <div class="flow-body">
+            <strong>タイトル</strong>
+            <span class="muted ellipsis" id="titleText"></span>
           </div>
-        </div>
-        <button type="button" class="btn-secondary" id="stepCopy">画像1をコピー</button>
-        <div class="btn-row">
-          <button type="button" class="btn small" id="stepPrev">前の画像</button>
-          <button type="button" class="btn small" id="stepNext">次の画像</button>
-          <button type="button" class="btn small" id="stepReset">最初から</button>
-        </div>
-      </section>
+          <button type="button" class="btn" id="copyTitle">コピー</button>
+        </li>
+        <li class="flow-step is-main">
+          <div class="flow-body">
+            <strong>本文</strong>
+            <span class="muted">見出し・太字・リスト・引用・リンクつき</span>
+          </div>
+          <button type="button" class="btn-primary" id="copyRich">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></svg>
+            本文をコピー
+          </button>
+        </li>
+        <li class="flow-step is-images" id="imageSteps" hidden>
+          <div class="flow-body">
+            <strong>画像 <span class="muted" id="stepCount"></span></strong>
+            <span class="muted">目印「［画像1：…］」の位置に1枚ずつ貼り付けます</span>
+          </div>
+          <div class="step-card">
+            <img id="stepThumb" alt="" width="56" height="56" hidden>
+            <div class="step-info">
+              <span class="ellipsis" id="stepLabel"></span>
+              <span class="muted" id="stepNote"></span>
+            </div>
+          </div>
+          <button type="button" class="btn-secondary" id="stepCopy">画像1をコピー</button>
+          <div class="btn-row">
+            <button type="button" class="btn small" id="stepPrev">前へ</button>
+            <button type="button" class="btn small" id="stepNext">次へ</button>
+            <button type="button" class="btn small" id="stepReset">最初から</button>
+          </div>
+        </li>
+      </ol>
+      <div id="copyResult" class="result" hidden aria-live="polite"></div>
 
       <details class="fallback">
         <summary>うまくいかない場合</summary>
         <div class="fallback-body">
           <div class="btn-row">
-            <button type="button" class="btn" id="selectAll">記事全体を選択</button>
-            <button type="button" class="btn" id="copyPlain">プレーンテキストをコピー</button>
+            <button type="button" class="btn" id="selectAll">本文を選択</button>
+            <button type="button" class="btn" id="copyPlain">装飾なしでコピー</button>
             <button type="button" class="btn" id="downloadHtml">HTMLファイルを保存</button>
           </div>
           <ol class="steps">
-            <li>「記事全体を選択」をタップすると、プレビューの本文が選択されます。</li>
-            <li>選択範囲をタップし、表示されるメニューから「コピー」を選びます。</li>
-            <li>noteの編集画面の本文欄を長押しし、「ペースト」を選びます。</li>
+            <li>「本文を選択」を押すと、プレビューの本文が選択されます。</li>
+            <li>選択範囲をタップし、メニューから「コピー」を選びます。</li>
+            <li>noteの本文欄を長押しして「ペースト」を選びます。</li>
           </ol>
-          <p class="hint">それでも装飾が残らない場合は、下の「分割コピー」で文章と画像を1つずつ貼り付ける方法があります。</p>
+        </div>
+      </details>
+
+      <details class="settings">
+        <summary>設定</summary>
+        <div class="options">
+          <label class="check"><input type="checkbox" id="extractTitle" checked> 最初の「# 見出し」を記事タイトルとして分ける</label>
+          <label class="check"><input type="checkbox" id="noteHeadings" checked> 見出しをnoteの大見出し・小見出しに合わせる</label>
         </div>
       </details>
     </div>
@@ -123,17 +142,18 @@
       <h1 class="paper-title" id="previewTitle" hidden></h1>
       <div class="paper-body" id="previewBody"></div>
     </article>
-
-    <details class="split">
-      <summary>分割コピー（文章と画像を順番に貼り付ける）</summary>
-      <p class="hint">noteが画像付きHTMLを受け付けない場合の代替手段です。上から順に「コピー」→ noteで「ペースト」を繰り返します。画像はPNG画像そのもの（バイナリ）としてコピーします。</p>
-      <ol class="segments" id="segments"></ol>
-    </details>
   </section>
 </main>
 
+<nav class="mobile-bar" aria-label="コピー操作">
+  <button type="button" class="btn" id="mTitle" hidden>タイトル</button>
+  <button type="button" class="btn-primary" id="mRich">本文をコピー</button>
+  <button type="button" class="btn-secondary" id="mImage" hidden>画像1</button>
+</nav>
+
 <footer class="footer">
   <p>記事データと画像はこのブラウザの中だけで処理され、外部サーバーへは送信されません。note公式のツールではありません。</p>
+  <p><a href="test.html">検証ページ（貼り付け方式のテスト用）</a></p>
 </footer>
 </body>
 </html>

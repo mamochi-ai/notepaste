@@ -1,12 +1,12 @@
-import { buildArticle, clipboardHtml, htmlToText, standaloneHtml, IMAGE_MODES } from './article.js';
+import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js';
 import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js';
 import { ImageStore, toPngBlob, formatBytes } from './images.js';
-import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp, bytesOf } from './common.js';
+import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js';
 
 const DRAFT_KEY = 'nps-draft';
-// v2：iPad＋noteの検証結果を受けて、画像の既定を「目印」に変更した
 const SETTINGS_KEY = 'nps-settings-v2';
 const MEMORY_WARN_BYTES = 40 * 1024 * 1024;
+const SAMPLE_REF = 'img:sample';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -14,32 +14,32 @@ const els = {
   fileInput: $('fileInput'),
   previewTitle: $('previewTitle'),
   previewBody: $('previewBody'),
+  imagesSection: $('imagesSection'),
   imageList: $('imageList'),
   imageSummary: $('imageSummary'),
-  segments: $('segments'),
   result: $('copyResult'),
-  imageMode: $('imageMode'),
   extractTitle: $('extractTitle'),
   noteHeadings: $('noteHeadings'),
-  copyTitle: $('copyTitle'),
+  titleStep: $('titleStep'),
+  titleText: $('titleText'),
   charCount: $('charCount'),
   saveState: $('saveState'),
-  modeHint: $('modeHint'),
   imageSteps: $('imageSteps'),
   stepCount: $('stepCount'),
   stepThumb: $('stepThumb'),
   stepLabel: $('stepLabel'),
   stepNote: $('stepNote'),
   stepCopy: $('stepCopy'),
+  mTitle: $('mTitle'),
+  mImage: $('mImage'),
 };
 
 const store = new ImageStore();
-const settings = Object.assign({ imageMode: 'none', extractTitle: true, noteHeadings: true }, storageGet(SETTINGS_KEY, {}));
+const settings = Object.assign({ extractTitle: true, noteHeadings: true }, storageGet(SETTINGS_KEY, {}));
 let caret = null; // 入力欄で最後にタップ・入力した位置
 let current = null; // 直近のプレビュー結果
-let step = 0; // 「画像を順番に貼る」で次にコピーする画像（0始まり）
-const copiedSteps = new Set();
-let lastStepMsg = '';
+let step = 0; // 次にコピーする画像（0始まり）
+const copied = new Set(); // コピー済みの項目（'title' / 'body' / 'img:<番号>'）。記事が変わったらリセット
 
 function opts(mode) {
   return { mode, extractTitle: settings.extractTitle, noteHeadings: settings.noteHeadings };
@@ -52,23 +52,74 @@ function render() {
   els.previewTitle.textContent = current.title || '';
   // renderMarkdown の出力はエスケープ済み・許可タグのみなので innerHTML に入れてよい
   els.previewBody.innerHTML = current.html || '<p class="empty">ここにプレビューが表示されます。</p>';
-  els.copyTitle.hidden = !current.title;
+  els.titleStep.hidden = els.mTitle.hidden = !current.title;
+  els.titleText.textContent = current.title || '';
   els.charCount.textContent = `${md.length.toLocaleString()} 文字`;
-  renderSegments();
+  markCopied();
   renderImageList();
   renderSteps();
 }
 
 let renderTimer = 0;
 let saveTimer = 0;
-function scheduleRender() {
+function onEdit() {
+  copied.clear();
   clearTimeout(renderTimer);
   renderTimer = setTimeout(render, 120);
   clearTimeout(saveTimer);
   els.saveState.textContent = '';
   saveTimer = setTimeout(() => {
-    els.saveState.textContent = storageSet(DRAFT_KEY, els.md.value) ? 'この端末に自動保存しました' : '自動保存できませんでした（プライベートブラウズ等）';
+    els.saveState.textContent = storageSet(DRAFT_KEY, els.md.value) ? '自動保存しました' : '自動保存できませんでした（プライベートブラウズ等）';
   }, 500);
+}
+
+function markCopied() {
+  $('copyTitle').textContent = copied.has('title') ? '✓ コピー済み' : 'コピー';
+  els.mTitle.textContent = copied.has('title') ? '✓ タイトル' : 'タイトル';
+  for (const id of ['copyRich', 'mRich']) $(id).classList.toggle('is-done', copied.has('body'));
+}
+
+// ---------- 入力 ----------
+
+function setArticle(text) {
+  els.md.value = text;
+  caret = null;
+  step = 0;
+  onEdit();
+}
+
+function onPasteFromClipboard() {
+  if (!(navigator.clipboard && navigator.clipboard.readText)) {
+    els.md.focus();
+    toast('入力欄を長押しして「ペースト」を選んでください');
+    return;
+  }
+  // Safari では「ペースト」の確認ボタンが表示される
+  navigator.clipboard.readText().then(
+    (text) => {
+      if (!text.trim()) return toast('クリップボードに文字がありません');
+      const v = els.md.value.trim();
+      if (v && v !== SAMPLE_MD.trim() && !confirm('入力中の記事を、クリップボードの内容に置き換えますか？')) return;
+      setArticle(text.replace(/\r\n?/g, '\n'));
+      toast('貼り付けました');
+    },
+    () => {
+      els.md.focus();
+      toast('読み取れませんでした。入力欄を長押しして「ペースト」を選んでください');
+    },
+  );
+}
+
+async function onNewArticle() {
+  const userImages = store.list().filter((it) => !it.builtin);
+  if (els.md.value.trim() || userImages.length) {
+    const msg = userImages.length ? '記事と、追加した画像をすべて消して新しく始めますか？' : '記事を消して新しく始めますか？';
+    if (!confirm(msg)) return;
+  }
+  for (const it of userImages) await store.remove(it.id);
+  setArticle('');
+  els.result.hidden = true;
+  els.md.focus();
 }
 
 // ---------- 画像 ----------
@@ -89,34 +140,34 @@ function insertAtCaret(snippet) {
   } catch (_) {
     /* 非表示時など */
   }
-  scheduleRender();
+  onEdit();
 }
 
 function imageRefMd(item) {
-  const alt = item.name.replace(/[\[\]\\]/g, '');
-  return `![${alt}](img:${item.id})`;
+  return `![${item.name.replace(/[\[\]\\]/g, '')}](img:${item.id})`;
 }
 
 async function addFiles(files) {
   let added = 0;
   for (const f of files) {
     try {
-      const item = await store.addFile(f);
-      insertAtCaret(imageRefMd(item));
+      insertAtCaret(imageRefMd(await store.addFile(f)));
       added++;
     } catch (e) {
       toast(`${f.name || '画像'}：${e.message}`);
     }
   }
-  if (added) toast(`${added}枚の画像を追加しました`);
+  if (added) toast(`${added}枚の画像を入れました`);
   if (store.persistError) els.imageSummary.title = `端末への保存に失敗：${store.persistError.message}`;
 }
 
 function renderImageList() {
   const used = new Set((current?.imageRefs || []).filter((r) => r.startsWith('img:')).map((r) => r.slice(4)));
-  const items = store.list();
+  // テスト画像はサンプル記事で使っているときだけ表示する
+  const items = store.list().filter((it) => !it.builtin || used.has(it.id));
   const total = store.totalBytes();
-  els.imageSummary.textContent = items.length ? `${items.length}枚・${formatBytes(total)}${total > MEMORY_WARN_BYTES ? '（多めです。不要な画像は削除を）' : ''}` : 'まだありません';
+  els.imagesSection.hidden = items.length === 0;
+  els.imageSummary.textContent = `${items.length}枚・${formatBytes(total)}${total > MEMORY_WARN_BYTES ? '（多めです。不要な画像は削除してください）' : ''}`;
   els.imageList.replaceChildren(
     ...items.map((it) =>
       h(
@@ -126,15 +177,13 @@ function renderImageList() {
         h(
           'div',
           { class: 'image-info' },
-          h('strong', {}, it.name + (it.builtin ? '（テスト用）' : '')),
-          h('code', {}, `img:${it.id}`),
-          h('span', { class: 'muted' }, `${it.width}×${it.height}・${formatBytes(it.size)}${used.has(it.id) ? '・記事で使用中' : ''}`),
+          h('strong', {}, it.name),
+          h('span', { class: 'muted' }, `${it.width}×${it.height}・${formatBytes(it.size)}${used.has(it.id) ? '' : '・記事で未使用'}`),
         ),
         h(
           'div',
           { class: 'image-actions' },
-          h('button', { type: 'button', class: 'btn small', onclick: () => insertAtCaret(imageRefMd(it)) }, '挿入'),
-          h('button', { type: 'button', class: 'btn small', onclick: () => copyImage(it, `画像「${it.name}」`) }, 'コピー'),
+          h('button', { type: 'button', class: 'btn small', onclick: () => insertAtCaret(imageRefMd(it)) }, 'カーソル位置に挿入'),
           it.builtin
             ? null
             : h(
@@ -143,7 +192,7 @@ function renderImageList() {
                   type: 'button',
                   class: 'btn small danger',
                   onclick: () => {
-                    const msg = used.has(it.id) ? 'この画像は記事中で使われています。削除しますか？（記事中の指定は残ります）' : 'この画像を削除しますか？';
+                    const msg = used.has(it.id) ? 'この画像は記事中で使われています。削除しますか？' : 'この画像を削除しますか？';
                     if (confirm(msg)) store.remove(it.id);
                   },
                 },
@@ -157,63 +206,58 @@ function renderImageList() {
 
 // ---------- コピー ----------
 
-function copyImage(item, label) {
-  // toPngBlob は非同期だが、Promise のまま ClipboardItem に渡す（タップ操作の扱いを保つ）
-  writeClipboard({ 'image/png': toPngBlob(item.blob) }, 'clipboard.write（image/png）').then((r) => {
-    showCopyResult(els.result, r, {
-      label,
-      notes: ['画像そのもの（バイナリ）をコピーしました。noteの本文で貼り付けると画像として取り込まれるかを確認してください。'],
-    });
-    els.result.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+function showFailure(r, label) {
+  showCopyResult(els.result, r, { label });
+  els.result.closest('.copy-panel').querySelector('details.fallback').open = true;
+  els.result.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function onCopyTitle() {
+  if (!current?.title) return;
+  copyPlain(current.title).then((r) => {
+    if (!r.ok) return showFailure(r, 'タイトル');
+    copied.add('title');
+    markCopied();
+    els.result.hidden = true;
+    toast('タイトルをコピーしました。noteのタイトル欄に貼り付けてください');
   });
 }
 
-function modeNotes(mode, art) {
-  const notes = [];
-  if (mode === 'bloburl' && art.stats.embedded) notes.push('Blob URLはこのページの中でだけ有効です。note側では画像が表示されない見込みです（比較用）。');
-  if (mode === 'https' && art.stats.placeholders) notes.push('追加した画像には公開URLがないため、目印の文字に置き換えました。');
-  if (mode === 'none' && art.stats.images) notes.push(`画像${art.stats.images}枚は「［画像1：…］」のような目印になっています。下の「画像を順番に貼る」で1枚ずつコピーし、目印の位置に貼り付けてください。`);
-  if (mode !== 'none' && art.stats.images) notes.push('iPad Safari＋noteの検証では、画像を含むHTMLは貼り付けできませんでした（検証用の設定です）。');
-  if (art.stats.pending) notes.push('一部の画像の準備が終わっていなかったため、目印に置き換えました。数秒後にもう一度コピーしてください。');
-  if (art.stats.missing) notes.push('記事中に、見つからない画像の指定があります。');
-  return notes;
-}
-
 function onCopyRich() {
-  const mode = settings.imageMode;
-  const art = buildArticle(els.md.value, store, opts(mode));
+  const art = buildArticle(els.md.value, store, opts('none'));
   if (!art.html) {
     toast('記事が空です');
     return;
   }
   const html = clipboardHtml(art.html);
   const text = htmlToText(art.html);
-  const htmlBytes = bytesOf(html);
-  const notes = modeNotes(mode, art);
-  if (htmlBytes > 3 * 1024 * 1024) notes.push('HTMLが3MBを超えています。貼り付け先で処理が重くなったり拒否されたりする可能性があります。');
-  // ここまで同期処理。copyRich の中で即座に clipboard.write を呼ぶ
+  // ここまで同期処理。copyRich の中で即座に clipboard.write を呼ぶ（Safariのタップ操作の制約）
   copyRich(html, text).then((r) => {
-    showCopyResult(els.result, r, { label: '記事本文（装飾付き）', imageMode: IMAGE_MODES[mode].short, stats: art.stats, htmlBytes, notes });
-    if (!r.ok) els.result.parentElement.querySelector('details.fallback').open = true;
+    if (!r.ok) return showFailure(r, '本文');
+    copied.add('body');
+    markCopied();
+    const n = art.stats.images;
+    showCopyResult(els.result, r, {
+      compact: true,
+      message: n
+        ? `本文をコピーしました。noteの本文欄に貼り付けたら、続けて画像${n}枚を目印の位置に貼り付けてください。`
+        : '本文をコピーしました。noteの本文欄に貼り付けてください。',
+    });
+    toast('本文をコピーしました');
   });
-}
-
-function onCopyTitle() {
-  if (!current?.title) return;
-  copyPlain(current.title).then((r) => showCopyResult(els.result, r, { label: 'タイトル', notes: ['noteの「記事タイトル」欄に貼り付けてください。'] }));
 }
 
 function onCopyPlain() {
   const art = buildArticle(els.md.value, store, opts('none'));
   const text = (art.title ? art.title + '\n\n' : '') + htmlToText(art.html);
-  copyPlain(text).then((r) => showCopyResult(els.result, r, { label: 'プレーンテキスト（装飾なし）' }));
+  copyPlain(text).then((r) => (r.ok ? toast('装飾なしの文章をコピーしました') : showFailure(r, '装飾なしの文章')));
 }
 
 async function onDownloadHtml() {
   await store.whenDataUrlsReady();
   const art = buildArticle(els.md.value, store, opts('dataurl'));
   download(`note-article-${dateStamp()}.html`, standaloneHtml(art.title, art.html), 'text/html');
-  toast('HTMLファイルを保存しました（画像はファイル内に埋め込まれています）');
+  toast('HTMLファイルを保存しました');
 }
 
 function onSelectAll() {
@@ -230,26 +274,20 @@ function imageSteps() {
 
 function renderSteps() {
   const steps = imageSteps();
-  const show = settings.imageMode === 'none' && steps.length > 0;
-  els.imageSteps.hidden = !show;
-  if (!show) return;
+  els.imageSteps.hidden = els.mImage.hidden = steps.length === 0;
+  if (!steps.length) return;
   step = Math.min(Math.max(step, 0), steps.length - 1);
   const s = steps[step];
+  const done = copied.has(`img:${s.n}`);
   els.stepCount.textContent = `${step + 1} / ${steps.length}`;
   els.stepLabel.textContent = `画像${s.n}：${s.alt}`;
   els.stepThumb.hidden = !s.item;
   if (s.item) els.stepThumb.src = s.item.url;
-  els.stepCopy.disabled = !s.item;
-  els.stepCopy.textContent = s.item ? `画像${s.n}をコピー` : 'コピーできない画像です';
-  $('stepDone').textContent = lastStepMsg;
-  $('stepDone').hidden = !lastStepMsg;
-  els.stepNote.textContent = !s.item
-    ? '外部URLの画像、または見つからない画像です。noteで直接挿入してください。'
-    : copiedSteps.has(step)
-      ? 'コピー済み'
-      : step === steps.length - 1
-        ? '最後の画像です'
-        : '';
+  els.stepCopy.disabled = els.mImage.disabled = !s.item;
+  els.stepCopy.textContent = s.item ? `${done ? '✓ ' : ''}画像${s.n}をコピー` : 'コピーできない画像です';
+  els.mImage.textContent = `${done ? '✓ ' : ''}画像${s.n}`;
+  const allDone = steps.every((x) => copied.has(`img:${x.n}`));
+  els.stepNote.textContent = !s.item ? '外部URLの画像です。noteで直接挿入してください' : allDone ? 'すべての画像をコピーしました' : done ? 'コピー済み' : '';
   $('stepPrev').disabled = step === 0;
   $('stepNext').disabled = step === steps.length - 1;
 }
@@ -258,133 +296,76 @@ function onStepCopy() {
   const steps = imageSteps();
   const s = steps[step];
   if (!s || !s.item) return;
-  const copiedIndex = step;
+  const index = step;
   // 同期的に clipboard.write まで到達させる（Safariのタップ操作の制約）
   writeClipboard({ 'image/png': toPngBlob(s.item.blob) }, 'clipboard.write（image/png）').then((r) => {
-    if (!r.ok) {
-      showCopyResult(els.result, r, { label: `画像${s.n}：${s.alt}` });
-      return;
-    }
-    copiedSteps.add(copiedIndex);
-    lastStepMsg = `画像${s.n}をコピーしました。noteの「［画像${s.n}：…］」の位置に貼り付けてください。`;
-    if (copiedIndex < steps.length - 1) step = copiedIndex + 1;
-    toast(`画像${s.n}をコピーしました`);
+    if (!r.ok) return showFailure(r, `画像${s.n}`);
+    copied.add(`img:${s.n}`);
+    if (index < steps.length - 1) step = index + 1;
+    els.result.hidden = true;
+    toast(`画像${s.n}をコピーしました。「［画像${s.n}：…］」の位置に貼り付けてください`);
     renderSteps();
-  });
-}
-
-// ---------- 分割コピー ----------
-
-function groupSegments(blocks) {
-  const segs = [];
-  for (const b of blocks) {
-    if (b.type === 'figure') segs.push({ type: 'image', ref: b.imageRef, blocks: [b] });
-    else if (segs.length && segs[segs.length - 1].type === 'text') segs[segs.length - 1].blocks.push(b);
-    else segs.push({ type: 'text', blocks: [b] });
-  }
-  return segs;
-}
-
-function segmentLabel(seg) {
-  const tmp = document.createElement('div');
-  tmp.innerHTML = seg.blocks.map((b) => b.html).join('');
-  const t = (tmp.querySelector('h1,h2,h3')?.textContent || tmp.textContent || '').trim();
-  return t.length > 36 ? t.slice(0, 36) + '…' : t || '（空）';
-}
-
-function renderSegments() {
-  const segs = groupSegments(current.blocks);
-  els.segments.replaceChildren(
-    ...segs.map((seg, idx) => {
-      if (seg.type === 'text') {
-        return h(
-          'li',
-          { class: 'segment' },
-          h('div', { class: 'segment-info' }, h('span', { class: 'segment-kind' }, `文章 ${idx + 1}`), h('span', {}, segmentLabel(seg))),
-          h('button', { type: 'button', class: 'btn', onclick: () => copySegment(idx) }, 'コピー'),
-        );
-      }
-      const item = store.fromRef(seg.ref);
-      return h(
-        'li',
-        { class: 'segment is-image' },
-        h(
-          'div',
-          { class: 'segment-info' },
-          h('span', { class: 'segment-kind' }, `画像 ${idx + 1}`),
-          item ? h('img', { src: item.url, alt: '', width: 56, height: 56 }) : h('span', { class: 'muted' }, seg.ref ? '外部画像または見つからない画像のため、コピーできません' : '許可されていない画像指定'),
-        ),
-        h('button', { type: 'button', class: 'btn', disabled: !item, onclick: () => item && copyImage(item, `画像 ${idx + 1}`) }, '画像をコピー'),
-      );
-    }),
-  );
-}
-
-function copySegment(idx) {
-  const art = buildArticle(els.md.value, store, opts('none'));
-  const seg = groupSegments(art.blocks)[idx];
-  if (!seg) return;
-  const bodyHtml = seg.blocks.map((b) => b.html).join('\n');
-  copyRich(clipboardHtml(bodyHtml), htmlToText(bodyHtml)).then((r) => {
-    showCopyResult(els.result, r, { label: `分割コピー：文章 ${idx + 1}` });
-    els.result.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   });
 }
 
 // ---------- 初期化 ----------
 
 function bindSettings() {
-  els.imageMode.value = IMAGE_MODES[settings.imageMode] ? settings.imageMode : 'none';
-  settings.imageMode = els.imageMode.value;
   els.extractTitle.checked = settings.extractTitle;
   els.noteHeadings.checked = settings.noteHeadings;
   const save = () => {
-    settings.imageMode = els.imageMode.value;
     settings.extractTitle = els.extractTitle.checked;
     settings.noteHeadings = els.noteHeadings.checked;
     storageSet(SETTINGS_KEY, settings);
-    els.modeHint.hidden = settings.imageMode === 'none';
+    copied.clear();
     render();
   };
-  els.modeHint.hidden = settings.imageMode === 'none';
-  for (const el of [els.imageMode, els.extractTitle, els.noteHeadings]) el.addEventListener('change', save);
+  els.extractTitle.addEventListener('change', save);
+  els.noteHeadings.addEventListener('change', save);
+}
+
+function bindHelp() {
+  const btn = $('helpToggle');
+  const help = $('help');
+  const set = (open) => {
+    help.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  };
+  btn.addEventListener('click', () => set(help.hidden));
+  // 初回だけ使い方を開いておく
+  if (!storageGet('nps-help-seen', false)) {
+    set(true);
+    storageSet('nps-help-seen', true);
+  }
 }
 
 async function main() {
   initTheme();
   bindSettings();
+  bindHelp();
   els.md.value = storageGet(DRAFT_KEY, null) ?? SAMPLE_MD;
   render();
 
   const trackCaret = () => (caret = els.md.selectionEnd);
   for (const ev of ['keyup', 'click', 'select', 'input', 'blur']) els.md.addEventListener(ev, trackCaret);
-  els.md.addEventListener('input', scheduleRender);
+  els.md.addEventListener('input', onEdit);
 
   els.fileInput.addEventListener('change', async () => {
     const files = [...els.fileInput.files];
     els.fileInput.value = '';
     await addFiles(files);
   });
-  $('loadSample').addEventListener('click', () => {
-    if (els.md.value.trim() && els.md.value !== SAMPLE_MD && !confirm('入力中の内容をサンプル記事に置き換えますか？')) return;
-    els.md.value = SAMPLE_MD;
-    caret = null;
-    scheduleRender();
-  });
-  $('clearText').addEventListener('click', () => {
-    if (!els.md.value || confirm('入力欄を空にしますか？（追加した画像は残ります）')) {
-      els.md.value = '';
-      caret = 0;
-      scheduleRender();
-      els.md.focus();
-    }
-  });
+  $('pasteFromClipboard').addEventListener('click', onPasteFromClipboard);
+  $('newArticle').addEventListener('click', onNewArticle);
+  $('copyTitle').addEventListener('click', onCopyTitle);
   $('copyRich').addEventListener('click', onCopyRich);
-  els.copyTitle.addEventListener('click', onCopyTitle);
   $('copyPlain').addEventListener('click', onCopyPlain);
   $('downloadHtml').addEventListener('click', onDownloadHtml);
   $('selectAll').addEventListener('click', onSelectAll);
   els.stepCopy.addEventListener('click', onStepCopy);
+  els.mTitle.addEventListener('click', onCopyTitle);
+  $('mRich').addEventListener('click', onCopyRich);
+  els.mImage.addEventListener('click', onStepCopy);
   $('stepPrev').addEventListener('click', () => {
     step--;
     renderSteps();
@@ -395,17 +376,19 @@ async function main() {
   });
   $('stepReset').addEventListener('click', () => {
     step = 0;
-    copiedSteps.clear();
-    lastStepMsg = '';
+    for (const k of [...copied]) if (k.startsWith('img:')) copied.delete(k);
     renderSteps();
   });
 
   store.onChange(render);
   await store.init();
-  try {
-    await store.addBuiltin('sample', 'assets/test-image.png', 'テスト画像');
-  } catch (e) {
-    toast(e.message);
+  // サンプル記事のテスト画像は、記事で使っているときだけ読み込む
+  if (els.md.value.includes(`(${SAMPLE_REF})`)) {
+    try {
+      await store.addBuiltin('sample', 'assets/test-image.png', 'テスト画像');
+    } catch (e) {
+      toast(e.message);
+    }
   }
 }
 

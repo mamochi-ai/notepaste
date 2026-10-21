@@ -1,0 +1,16 @@
+{
+  "name": "note Paste Studio",
+  "short_name": "Paste Studio",
+  "description": "AIが書いたMarkdown記事を、装飾を保ったままnoteに貼り付けるためのツール",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f1",
+  "theme_color": "#2f6f62",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
