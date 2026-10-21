@@ -184,6 +184,11 @@ export class ImageStore {
       size: blob.size,
       createdAt: Date.now(),
     };
+    return this.addRecord(rec);
+  }
+
+  /** 画像レコード（id・blob・大きさなど）をそのまま保存する。バックアップの復元にも使う */
+  async addRecord(rec, { emit = true } = {}) {
     if (this.db) {
       try {
         await tx(this.db, 'readwrite', (s) => s.put(rec));
@@ -191,8 +196,10 @@ export class ImageStore {
         this.persistError = e;
       }
     }
+    const old = this.items.get(rec.id);
+    if (old) URL.revokeObjectURL(old.url);
     const item = this.attach(rec);
-    this.emit();
+    if (emit) this.emit();
     return item;
   }
 

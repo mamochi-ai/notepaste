@@ -16,8 +16,8 @@
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="css/style.css?v=202610211233">
-<script type="module" src="js/editor.js?v=202610211233"></script>
+<link rel="stylesheet" href="css/style.css?v=202610211236">
+<script type="module" src="js/editor.js?v=202610211236"></script>
 </head>
 <body class="editor-page">
 <header class="topbar">
@@ -164,7 +164,16 @@
   </div>
   <button type="button" class="btn-primary" id="newFromList">＋ 新しい記事</button>
   <ul class="article-list" id="articleList"></ul>
-  <p class="hint">記事と画像はこの端末のブラウザ内に保存されます。</p>
+  <section class="backup" aria-labelledby="backupTitle">
+    <h3 id="backupTitle">バックアップ</h3>
+    <p class="hint">記事と画像はこの端末のブラウザ内にだけ保存されています。Safariのデータを消したときや端末を替えるときに備えて、ときどきファイルに保存してください。</p>
+    <div class="btn-row">
+      <button type="button" class="btn" id="saveBackup">バックアップを保存</button>
+      <label class="btn" for="backupInput">バックアップから復元</label>
+      <input type="file" id="backupInput" accept="application/json,.json" class="visually-hidden">
+    </div>
+    <p class="muted backup-status" id="backupStatus"></p>
+  </section>
 </dialog>
 
 <nav class="mobile-bar" aria-label="コピー操作">

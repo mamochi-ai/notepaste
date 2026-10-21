@@ -885,3 +885,7 @@ details[open] > summary::before { transform: rotate(45deg); }
 
 .pane-input .pane-head { flex-direction: column; align-items: stretch; }
 .pane-input .toolbar .btn { padding: 0 14px; }
+
+.backup { border-top: 1px solid var(--border); padding-top: 12px; display: grid; gap: 8px; }
+.backup h3 { margin: 0; font-size: 0.95rem; }
+.backup-status { margin: 0; font-size: 0.82rem; }

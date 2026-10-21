@@ -1,8 +1,9 @@
-import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610211233';
-import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610211233';
-import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610211233';
-import { ArticleStore, articleTitle, imageIdsOf } from './articles.js?v=202610211233';
-import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610211233';
+import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610211236';
+import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610211236';
+import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610211236';
+import { ArticleStore, articleTitle, imageIdsOf } from './articles.js?v=202610211236';
+import { buildBackup, parseBackup } from './backup.js?v=202610211236';
+import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610211236';
 
 const SETTINGS_KEY = 'nps-settings-v2';
 const MEMORY_WARN_BYTES = 40 * 1024 * 1024;
@@ -211,9 +212,66 @@ async function deleteArticle(id) {
   toast('削除しました');
 }
 
+// ---------- バックアップ ----------
+
+const LAST_BACKUP_KEY = 'nps-last-backup';
+
+function renderBackupStatus() {
+  const last = storageGet(LAST_BACKUP_KEY, null);
+  const newest = Math.max(...articles.list.map((a) => a.updatedAt));
+  $('backupStatus').textContent = !last
+    ? 'まだバックアップしていません。'
+    : `最後のバックアップ：${new Date(last).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}${newest > last ? '（その後に変更があります）' : ''}`;
+}
+
+async function onSaveBackup() {
+  saveNow();
+  try {
+    const json = await buildBackup(articles, store);
+    download(`note-paste-backup-${dateStamp()}.json`, json, 'application/json');
+    storageSet(LAST_BACKUP_KEY, Date.now());
+    renderBackupStatus();
+    toast('バックアップを保存しました（「ファイル」アプリの「ダウンロード」に入ります）');
+  } catch (e) {
+    toast(`バックアップを保存できませんでした：${e.message}`);
+  }
+}
+
+async function onRestoreBackup(file) {
+  let data;
+  try {
+    data = parseBackup(await file.text());
+  } catch (e) {
+    toast(e.message);
+    return;
+  }
+  const when = data.exportedAt ? new Date(data.exportedAt).toLocaleString('ja-JP') : '日時不明';
+  const msg = `バックアップ（${when}）から、記事${data.articles.length}件・画像${data.images.length}枚を読み込みますか？\n今ある記事は消えません。同じ記事があるときは、新しいほうを残します。`;
+  if (!confirm(msg)) return;
+  saveNow();
+  let imgFail = 0;
+  for (const rec of data.images) {
+    if (store.get(rec.id)) continue;
+    try {
+      await store.addRecord(rec, { emit: false });
+    } catch (_) {
+      imgFail++;
+    }
+  }
+  const r = articles.merge(data.articles);
+  showArticle(articles.current);
+  renderArticleList();
+  const parts = [`追加 ${r.added}件`, `更新 ${r.updated}件`];
+  if (r.skipped) parts.push(`変更なし ${r.skipped}件`);
+  if (data.skipped || imgFail) parts.push(`読み込めなかった項目 ${data.skipped + imgFail}件`);
+  toast(`復元しました（${parts.join('・')}）`);
+  if (!articles.lastSaveOk) toast('記事を保存できませんでした（容量不足の可能性があります）');
+}
+
 function openArticleList() {
   saveNow();
   renderArticleList();
+  renderBackupStatus();
   if (typeof dialog.showModal === 'function') dialog.showModal();
   else dialog.setAttribute('open', '');
 }
@@ -468,6 +526,12 @@ async function main() {
   $('openArticles').addEventListener('click', openArticleList);
   $('closeArticles').addEventListener('click', closeArticleList);
   $('newFromList').addEventListener('click', onNewArticle);
+  $('saveBackup').addEventListener('click', onSaveBackup);
+  $('backupInput').addEventListener('change', async () => {
+    const f = $('backupInput').files[0];
+    $('backupInput').value = '';
+    if (f) await onRestoreBackup(f);
+  });
   // 背景をタップしたら閉じる
   dialog.addEventListener('click', (e) => e.target === dialog && closeArticleList());
   // 別のアプリに切り替えるときは、待たずに保存する
