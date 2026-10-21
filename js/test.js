@@ -25,6 +25,8 @@ const VERIFIED = {
   png: ['ok', 'iPad検証：画像として貼れた'],
   legacy: ['ng', 'iPad検証：noteに貼り付けできず'],
   manual: ['ng', 'iPad検証：noteに貼り付けできず'],
+  'html-png-one': ['ng', 'iPad検証：画像だけ貼れた（文章は消えた）'],
+  'html-png-multi': ['ng', 'iPad検証：文章だけ貼れた（画像は消えた）'],
 };
 const ELEMENTS = ['見出し', '太字', '箇条書き', '番号付きリスト', '画像', 'リンク', '引用'];
 
