@@ -198,4 +198,7 @@ noteに貼り付けたら、次の項目を確認して記録してください�
 ```sh
 npm test          # node --test tests/*.test.mjs
 npm run serve     # http://localhost:8000/ で確認
+npm run bump      # 公開前に実行（CSS・JSの読み込みURLのバージョンを更新）
 ```
+
+GitHub PagesはCSSやJSを約10分キャッシュさせます。HTMLだけ新しくなって表示が崩れないよう、変更を公開する前に `npm run bump` を実行してください。
