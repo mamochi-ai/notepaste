@@ -21,7 +21,7 @@ const VERIFIED = {
   'html-dataurl': ['ng', 'iPad検証：noteに貼り付けできず'],
   'html-bloburl': ['ng', 'iPad検証：noteに貼り付けできず'],
   'html-https': ['ng', 'iPad検証：noteに貼り付けできず'],
-  'html-none': ['ok', 'iPad検証：見出し・太字・リンクが残った'],
+  'html-none': ['ok', 'iPad検証：見出し・太字・リスト・引用・リンクが残った'],
   png: ['ok', 'iPad検証：画像として貼れた'],
   legacy: ['ng', 'iPad検証：noteに貼り付けできず'],
   manual: ['ng', 'iPad検証：noteに貼り付けできず'],
