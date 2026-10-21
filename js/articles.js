@@ -1,6 +1,6 @@
 // 複数の記事の保存（localStorage）。画像は images.js（IndexedDB）に別保存し、本文中の img:ID で参照する。
 
-import { storageGet, storageSet } from './common.js?v=202610211233';
+import { storageGet, storageSet } from './common.js?v=202610211236';
 
 const ARTICLES_KEY = 'nps-articles';
 const CURRENT_KEY = 'nps-current';
@@ -94,6 +94,26 @@ export class ArticleStore {
   }
 
   /** どれかの記事で使われている画像ID */
+  /**
+   * バックアップの記事を取り込む。同じIDの記事は更新日時が新しいほうを残す。
+   * @returns {{added:number, updated:number, skipped:number}}
+   */
+  merge(list) {
+    const r = { added: 0, updated: 0, skipped: 0 };
+    for (const a of list) {
+      const i = this.list.findIndex((x) => x.id === a.id);
+      if (i < 0) {
+        this.list.push({ ...a });
+        r.added++;
+      } else if (a.updatedAt > this.list[i].updatedAt) {
+        this.list[i] = { ...a };
+        r.updated++;
+      } else r.skipped++;
+    }
+    this.lastSaveOk = this.persist();
+    return r;
+  }
+
   usedImageIds() {
     const ids = new Set();
     for (const a of this.list) for (const id of imageIdsOf(a.md)) ids.add(id);
