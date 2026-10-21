@@ -66,6 +66,8 @@ function unescapeMd(s) {
  *   サニタイズ済みの画像指定（img:ID / https / data）を、実際に出力する src に変換する。
  * @param {boolean} [opts.extractTitle] 先頭のH1を本文から外し、title として返す
  * @param {boolean} [opts.noteHeadings] noteの「大見出し(h2)/小見出し(h3)」に合わせて見出しを変換する
+ * @param {boolean} [opts.tableAsList] 表を箇条書きに変換する（noteは表に非対応）
+ * @param {'none'|'marker'|'list'} [opts.toc] 最初の見出しの前に目次を入れる（目印、または見出しの箇条書き）
  * @returns {{html:string, title:string|null, blocks:Array<{type:'block'|'figure', html:string, imageRef?:string}>, imageRefs:string[], images:Array<{src:string, alt:string}>}}
  */
 export function renderMarkdown(md, opts = {}) {
@@ -78,6 +80,7 @@ class Renderer {
     this.resolveImage = opts.resolveImage || defaultResolveImage;
     this.imageRefs = [];
     this.images = [];
+    this.headings = []; // 本文の見出し（目次用）。{ level, html, index: blocks内の位置 }
     this.title = null;
     this.depth = 0;
   }
@@ -88,6 +91,7 @@ class Renderer {
       .split('\n')
       .map((l) => l.replace(/^\t+/, (t) => '    '.repeat(t.length)));
     const blocks = this.parseBlocks(lines, true);
+    this.insertToc(blocks);
     return {
       html: blocks.map((b) => b.html).join('\n'),
       title: this.title,
@@ -157,7 +161,9 @@ class Renderer {
           first = false;
           continue;
         }
-        out.push({ type: 'block', html: this.heading(level, text) });
+        const hh = this.heading(level, text);
+        if (top && /^<h\d/.test(hh)) this.headings.push({ level: Number(hh[2]), html: this.inline(text), index: out.length });
+        out.push({ type: 'block', html: hh });
         first = false;
         continue;
       }
@@ -250,6 +256,40 @@ class Renderer {
     return `<h${tag}>${this.inline(text)}</h${tag}>`;
   }
 
+  insertToc(blocks) {
+    const mode = this.opts.toc;
+    if (!mode || mode === 'none' || !this.headings.length) return;
+    const at = this.headings[0].index;
+    if (mode === 'marker') {
+      blocks.splice(at, 0, { type: 'block', html: '<p>［ここに目次：noteの「＋」→「目次」で挿入］</p>', toc: true });
+      return;
+    }
+    // 一番浅い見出しを1段目、それより深い見出しを2段目にする
+    const min = Math.min(...this.headings.map((x) => x.level));
+    let html = '';
+    let open = false;
+    for (const x of this.headings) {
+      if (x.level > min) {
+        if (!open) {
+          if (!html) html += '<li>';
+          html += '<ul>';
+          open = true;
+        }
+        html += `<li>${x.html}</li>`;
+      } else {
+        if (open) {
+          html += '</ul>';
+          open = false;
+        }
+        if (html) html += '</li>';
+        html += `<li>${x.html}`;
+      }
+    }
+    if (open) html += '</ul>';
+    html += '</li>';
+    blocks.splice(at, 0, { type: 'block', html: `<p><strong>目次</strong></p>\n<ul>${html}</ul>`, toc: true });
+  }
+
   parseList(lines, start) {
     const items = [];
     let i = start;
@@ -332,6 +372,17 @@ class Renderer {
     };
     const head = split(rows[0]);
     const body = rows.slice(1).map(split);
+    if (this.opts.tableAsList) {
+      // 1列目を項目名にして「**項目**：見出し 値／見出し 値」の箇条書きにする
+      const lis = body.map((r) => {
+        const rest = head.slice(1).map((hd, k) => {
+          const v = this.inline(r[k + 1] || '');
+          return head.length > 2 && hd ? `${this.inline(hd)} ${v}` : v;
+        });
+        return `<li><strong>${this.inline(r[0] || '')}</strong>${rest.length ? '：' + rest.join('／') : ''}</li>`;
+      });
+      return `<ul>${lis.join('')}</ul>`;
+    }
     const th = head.map((c) => `<th>${this.inline(c)}</th>`).join('');
     const trs = body.map((r) => `<tr>${head.map((_, k) => `<td>${this.inline(r[k] || '')}</td>`).join('')}</tr>`).join('');
     return `<table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`;

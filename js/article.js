@@ -1,6 +1,6 @@
 // 記事の組み立て：Markdown + 画像の扱い方（モード）から、コピー用HTML・プレーンテキストを作る
 
-import { renderMarkdown, escapeHtml } from './markdown.js?v=202610211208';
+import { renderMarkdown, escapeHtml } from './markdown.js?v=202610211221';
 
 export const IMAGE_MODES = {
   none: { label: '画像なし（位置の目印のみ）', short: '画像なし（目印）' },
@@ -17,7 +17,7 @@ export function imageMarker(n, label) {
 /**
  * @param {string} md
  * @param {import('./images.js').ImageStore} store
- * @param {{mode:'preview'|'dataurl'|'bloburl'|'https'|'none', extractTitle?:boolean, noteHeadings?:boolean}} opt
+ * @param {{mode:'preview'|'dataurl'|'bloburl'|'https'|'none', extractTitle?:boolean, noteHeadings?:boolean, tableAsList?:boolean, toc?:'none'|'marker'|'list'}} opt
  */
 export function buildArticle(md, store, opt) {
   const stats = { images: 0, embedded: 0, placeholders: 0, pending: 0, missing: 0 };
@@ -66,6 +66,8 @@ export function buildArticle(md, store, opt) {
     resolveImage,
     extractTitle: !!opt.extractTitle,
     noteHeadings: !!opt.noteHeadings,
+    tableAsList: !!opt.tableAsList,
+    toc: opt.toc || 'none',
   });
   return { ...r, stats };
 }

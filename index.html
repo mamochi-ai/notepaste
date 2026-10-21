@@ -16,8 +16,8 @@
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="css/style.css?v=202610211208">
-<script type="module" src="js/editor.js?v=202610211208"></script>
+<link rel="stylesheet" href="css/style.css?v=202610211221">
+<script type="module" src="js/editor.js?v=202610211221"></script>
 </head>
 <body class="editor-page">
 <header class="topbar">
@@ -110,6 +110,16 @@
           </div>
         </li>
       </ol>
+      <label class="field toc-field">
+        <span>目次</span>
+        <select id="toc">
+          <option value="marker">noteの目次機能を使う（位置に目印）</option>
+          <option value="list">見出しの一覧を文章で入れる</option>
+          <option value="none">入れない</option>
+        </select>
+      </label>
+      <p class="hint toc-hint" id="tocHint">noteの目次は、本文を貼り付けたあと「［ここに目次…］」の行で、編集画面の「＋」→「目次」を選ぶと入ります（見出しへ移動できる目次になります）。目印の文字は消してください。</p>
+
       <div id="copyResult" class="result" hidden aria-live="polite"></div>
 
       <details class="fallback">
@@ -133,6 +143,7 @@
         <div class="options">
           <label class="check"><input type="checkbox" id="extractTitle" checked> 最初の「# 見出し」を記事タイトルとして分ける</label>
           <label class="check"><input type="checkbox" id="noteHeadings" checked> 見出しをnoteの大見出し・小見出しに合わせる</label>
+          <label class="check"><input type="checkbox" id="tableAsList" checked> 表を箇条書きに変換する（noteは表に対応していません）</label>
         </div>
       </details>
     </div>

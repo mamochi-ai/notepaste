@@ -1,7 +1,7 @@
-import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610211208';
-import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610211208';
-import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610211208';
-import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610211208';
+import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610211221';
+import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610211221';
+import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610211221';
+import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610211221';
 
 const DRAFT_KEY = 'nps-draft';
 const SETTINGS_KEY = 'nps-settings-v2';
@@ -20,6 +20,8 @@ const els = {
   result: $('copyResult'),
   extractTitle: $('extractTitle'),
   noteHeadings: $('noteHeadings'),
+  tableAsList: $('tableAsList'),
+  toc: $('toc'),
   titleStep: $('titleStep'),
   titleText: $('titleText'),
   charCount: $('charCount'),
@@ -35,14 +37,14 @@ const els = {
 };
 
 const store = new ImageStore();
-const settings = Object.assign({ extractTitle: true, noteHeadings: true }, storageGet(SETTINGS_KEY, {}));
+const settings = Object.assign({ extractTitle: true, noteHeadings: true, tableAsList: true, toc: 'marker' }, storageGet(SETTINGS_KEY, {}));
 let caret = null; // 入力欄で最後にタップ・入力した位置
 let current = null; // 直近のプレビュー結果
 let step = 0; // 次にコピーする画像（0始まり）
 const copied = new Set(); // コピー済みの項目（'title' / 'body' / 'img:<番号>'）。記事が変わったらリセット
 
 function opts(mode) {
-  return { mode, extractTitle: settings.extractTitle, noteHeadings: settings.noteHeadings };
+  return { mode, extractTitle: settings.extractTitle, noteHeadings: settings.noteHeadings, tableAsList: settings.tableAsList, toc: settings.toc };
 }
 
 function render() {
@@ -313,15 +315,20 @@ function onStepCopy() {
 function bindSettings() {
   els.extractTitle.checked = settings.extractTitle;
   els.noteHeadings.checked = settings.noteHeadings;
+  els.tableAsList.checked = settings.tableAsList;
+  els.toc.value = ['none', 'marker', 'list'].includes(settings.toc) ? settings.toc : 'marker';
   const save = () => {
     settings.extractTitle = els.extractTitle.checked;
     settings.noteHeadings = els.noteHeadings.checked;
+    settings.tableAsList = els.tableAsList.checked;
+    settings.toc = els.toc.value;
+    $('tocHint').hidden = settings.toc !== 'marker';
     storageSet(SETTINGS_KEY, settings);
     copied.clear();
     render();
   };
-  els.extractTitle.addEventListener('change', save);
-  els.noteHeadings.addEventListener('change', save);
+  for (const el of [els.extractTitle, els.noteHeadings, els.tableAsList, els.toc]) el.addEventListener('change', save);
+  $('tocHint').hidden = settings.toc !== 'marker';
 }
 
 function bindHelp() {
