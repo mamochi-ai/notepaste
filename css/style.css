@@ -723,3 +723,60 @@ details[open] > summary::before { transform: rotate(45deg); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- 画像を順番に貼る ---------- */
+
+.image-steps {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+.image-steps[hidden] { display: none; }
+.image-steps .hint { margin: 0; color: var(--text); opacity: 0.8; }
+.step-card { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.step-card img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex: none; background: var(--border); }
+.step-info { display: grid; gap: 2px; min-width: 0; }
+.step-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-info .muted { font-size: 0.82rem; }
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 54px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.02rem;
+  background: var(--surface);
+  color: var(--accent);
+  border: 2px solid var(--accent);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.btn-secondary:active { transform: scale(0.98); }
+.btn-secondary[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+.verified {
+  justify-self: start;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+}
+.verified.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
+.verified.ng { color: var(--ng); background: var(--ng-soft); border-color: transparent; }
+
+.findings { margin: 12px 0 0; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--accent-soft); font-size: 0.9rem; }
+.findings h2 { font-size: 0.95rem; margin: 0 0 6px; }
+.findings ul { margin: 0; padding-left: 1.3em; }
+.step-done { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--ok-soft); color: var(--ok); font-size: 0.86rem; font-weight: 600; }
+.step-done[hidden] { display: none; }

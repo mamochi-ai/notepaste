@@ -4,7 +4,8 @@ import { ImageStore, toPngBlob, formatBytes } from './images.js';
 import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp, bytesOf } from './common.js';
 
 const DRAFT_KEY = 'nps-draft';
-const SETTINGS_KEY = 'nps-settings';
+// v2：iPad＋noteの検証結果を受けて、画像の既定を「目印」に変更した
+const SETTINGS_KEY = 'nps-settings-v2';
 const MEMORY_WARN_BYTES = 40 * 1024 * 1024;
 
 const $ = (id) => document.getElementById(id);
@@ -23,12 +24,22 @@ const els = {
   copyTitle: $('copyTitle'),
   charCount: $('charCount'),
   saveState: $('saveState'),
+  modeHint: $('modeHint'),
+  imageSteps: $('imageSteps'),
+  stepCount: $('stepCount'),
+  stepThumb: $('stepThumb'),
+  stepLabel: $('stepLabel'),
+  stepNote: $('stepNote'),
+  stepCopy: $('stepCopy'),
 };
 
 const store = new ImageStore();
-const settings = Object.assign({ imageMode: 'dataurl', extractTitle: true, noteHeadings: true }, storageGet(SETTINGS_KEY, {}));
+const settings = Object.assign({ imageMode: 'none', extractTitle: true, noteHeadings: true }, storageGet(SETTINGS_KEY, {}));
 let caret = null; // 入力欄で最後にタップ・入力した位置
 let current = null; // 直近のプレビュー結果
+let step = 0; // 「画像を順番に貼る」で次にコピーする画像（0始まり）
+const copiedSteps = new Set();
+let lastStepMsg = '';
 
 function opts(mode) {
   return { mode, extractTitle: settings.extractTitle, noteHeadings: settings.noteHeadings };
@@ -45,6 +56,7 @@ function render() {
   els.charCount.textContent = `${md.length.toLocaleString()} 文字`;
   renderSegments();
   renderImageList();
+  renderSteps();
 }
 
 let renderTimer = 0;
@@ -160,7 +172,8 @@ function modeNotes(mode, art) {
   const notes = [];
   if (mode === 'bloburl' && art.stats.embedded) notes.push('Blob URLはこのページの中でだけ有効です。note側では画像が表示されない見込みです（比較用）。');
   if (mode === 'https' && art.stats.placeholders) notes.push('追加した画像には公開URLがないため、目印の文字に置き換えました。');
-  if (mode === 'none' && art.stats.images) notes.push('画像は「［ここに画像：…］」の目印になっています。noteで目印の位置に画像を挿入してください。');
+  if (mode === 'none' && art.stats.images) notes.push(`画像${art.stats.images}枚は「［画像1：…］」のような目印になっています。下の「画像を順番に貼る」で1枚ずつコピーし、目印の位置に貼り付けてください。`);
+  if (mode !== 'none' && art.stats.images) notes.push('iPad Safari＋noteの検証では、画像を含むHTMLは貼り付けできませんでした（検証用の設定です）。');
   if (art.stats.pending) notes.push('一部の画像の準備が終わっていなかったため、目印に置き換えました。数秒後にもう一度コピーしてください。');
   if (art.stats.missing) notes.push('記事中に、見つからない画像の指定があります。');
   return notes;
@@ -207,6 +220,57 @@ function onSelectAll() {
   selectElement(els.previewBody);
   els.previewBody.scrollIntoView({ block: 'start', behavior: 'smooth' });
   toast('選択しました。選択範囲をタップして「コピー」を選んでください');
+}
+
+// ---------- 画像を順番に貼る ----------
+
+function imageSteps() {
+  return (current?.images || []).map((im, i) => ({ n: i + 1, alt: im.alt || '画像', item: store.fromRef(im.src) }));
+}
+
+function renderSteps() {
+  const steps = imageSteps();
+  const show = settings.imageMode === 'none' && steps.length > 0;
+  els.imageSteps.hidden = !show;
+  if (!show) return;
+  step = Math.min(Math.max(step, 0), steps.length - 1);
+  const s = steps[step];
+  els.stepCount.textContent = `${step + 1} / ${steps.length}`;
+  els.stepLabel.textContent = `画像${s.n}：${s.alt}`;
+  els.stepThumb.hidden = !s.item;
+  if (s.item) els.stepThumb.src = s.item.url;
+  els.stepCopy.disabled = !s.item;
+  els.stepCopy.textContent = s.item ? `画像${s.n}をコピー` : 'コピーできない画像です';
+  $('stepDone').textContent = lastStepMsg;
+  $('stepDone').hidden = !lastStepMsg;
+  els.stepNote.textContent = !s.item
+    ? '外部URLの画像、または見つからない画像です。noteで直接挿入してください。'
+    : copiedSteps.has(step)
+      ? 'コピー済み'
+      : step === steps.length - 1
+        ? '最後の画像です'
+        : '';
+  $('stepPrev').disabled = step === 0;
+  $('stepNext').disabled = step === steps.length - 1;
+}
+
+function onStepCopy() {
+  const steps = imageSteps();
+  const s = steps[step];
+  if (!s || !s.item) return;
+  const copiedIndex = step;
+  // 同期的に clipboard.write まで到達させる（Safariのタップ操作の制約）
+  writeClipboard({ 'image/png': toPngBlob(s.item.blob) }, 'clipboard.write（image/png）').then((r) => {
+    if (!r.ok) {
+      showCopyResult(els.result, r, { label: `画像${s.n}：${s.alt}` });
+      return;
+    }
+    copiedSteps.add(copiedIndex);
+    lastStepMsg = `画像${s.n}をコピーしました。noteの「［画像${s.n}：…］」の位置に貼り付けてください。`;
+    if (copiedIndex < steps.length - 1) step = copiedIndex + 1;
+    toast(`画像${s.n}をコピーしました`);
+    renderSteps();
+  });
 }
 
 // ---------- 分割コピー ----------
@@ -270,7 +334,7 @@ function copySegment(idx) {
 // ---------- 初期化 ----------
 
 function bindSettings() {
-  els.imageMode.value = IMAGE_MODES[settings.imageMode] ? settings.imageMode : 'dataurl';
+  els.imageMode.value = IMAGE_MODES[settings.imageMode] ? settings.imageMode : 'none';
   settings.imageMode = els.imageMode.value;
   els.extractTitle.checked = settings.extractTitle;
   els.noteHeadings.checked = settings.noteHeadings;
@@ -279,8 +343,10 @@ function bindSettings() {
     settings.extractTitle = els.extractTitle.checked;
     settings.noteHeadings = els.noteHeadings.checked;
     storageSet(SETTINGS_KEY, settings);
+    els.modeHint.hidden = settings.imageMode === 'none';
     render();
   };
+  els.modeHint.hidden = settings.imageMode === 'none';
   for (const el of [els.imageMode, els.extractTitle, els.noteHeadings]) el.addEventListener('change', save);
 }
 
@@ -318,6 +384,21 @@ async function main() {
   $('copyPlain').addEventListener('click', onCopyPlain);
   $('downloadHtml').addEventListener('click', onDownloadHtml);
   $('selectAll').addEventListener('click', onSelectAll);
+  els.stepCopy.addEventListener('click', onStepCopy);
+  $('stepPrev').addEventListener('click', () => {
+    step--;
+    renderSteps();
+  });
+  $('stepNext').addEventListener('click', () => {
+    step++;
+    renderSteps();
+  });
+  $('stepReset').addEventListener('click', () => {
+    step = 0;
+    copiedSteps.clear();
+    lastStepMsg = '';
+    renderSteps();
+  });
 
   store.onChange(render);
   await store.init();

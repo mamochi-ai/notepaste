@@ -137,7 +137,7 @@ export function showCopyResult(box, r, info = {}) {
       { class: 'result-note' },
       r.ok
         ? 'noteへの貼り付け結果：未確認です。noteの編集画面で貼り付け、見出し・太字・画像が残るか確認してください。'
-        : '下の「うまくいかない場合」の方法（全選択して手動コピー・プレーンテキスト・HTML保存）を試してください。',
+        : info.failHint || '下の「うまくいかない場合」の方法（全選択して手動コピー・プレーンテキスト・HTML保存）を試してください。',
     ),
   );
   const dl = h('dl', { class: 'result-meta' });

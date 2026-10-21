@@ -65,8 +65,16 @@ const toBlob = (v, type) =>
  * @param {Record<string, string|Blob|Promise<string|Blob>>} data 例: {'text/html': html, 'text/plain': text}
  * @returns {Promise<CopyResult>} 例外は投げず、結果オブジェクトで返す
  */
-export async function writeClipboard(data, method = 'clipboard.write') {
-  const types = Object.keys(data);
+export function writeClipboard(data, method = 'clipboard.write') {
+  return writeClipboardItems([data], method);
+}
+
+/**
+ * 複数の ClipboardItem をまとめて書き込む（検証用）。
+ * @param {Array<Record<string, string|Blob|Promise<string|Blob>>>} list
+ */
+export async function writeClipboardItems(list, method = 'clipboard.write') {
+  const types = list.length > 1 ? list.map((d, i) => `[${i + 1}] ${Object.keys(d).join(' + ')}`) : Object.keys(list[0]);
   const t0 = performance.now();
   const base = { method, types, at: new Date().toISOString() };
   try {
@@ -80,11 +88,13 @@ export async function writeClipboard(data, method = 'clipboard.write') {
       e.name = 'NotSupportedError';
       throw e;
     }
-    const entries = {};
-    for (const t of types) entries[t] = toBlob(data[t], t);
+    const items = list.map((data) => {
+      const entries = {};
+      for (const t of Object.keys(data)) entries[t] = toBlob(data[t], t);
+      return new ClipboardItem(entries);
+    });
     // ここまで await なし（ユーザー操作の扱いを保つため）
-    const item = new ClipboardItem(entries);
-    await navigator.clipboard.write([item]);
+    await navigator.clipboard.write(items);
     return { ...base, ok: true, durationMs: Math.round(performance.now() - t0) };
   } catch (e) {
     return { ...base, ok: false, error: describeError(e), durationMs: Math.round(performance.now() - t0) };

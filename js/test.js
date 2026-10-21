@@ -1,5 +1,5 @@
 import { buildArticle, clipboardHtml, htmlToText, IMAGE_MODES } from './article.js';
-import { copyRich, copyPlain, legacyCopy, writeClipboard, selectElement, clipboardEnv } from './clipboard.js';
+import { copyRich, copyPlain, legacyCopy, writeClipboard, writeClipboardItems, selectElement, clipboardEnv } from './clipboard.js';
 import { ImageStore, toPngBlob } from './images.js';
 import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp, bytesOf } from './common.js';
 
@@ -9,12 +9,23 @@ const store = new ImageStore();
 const opt = { extractTitle: true, noteHeadings: true };
 
 const NOTE_RESULTS = [
-  ['', '未確認'],
-  ['all', '成功（すべて残った）'],
-  ['partial', '一部だけ残った'],
-  ['textonly', '文字だけ残った（装飾なし）'],
-  ['fail', '貼り付けできなかった'],
+  ['', '選んでください'],
+  ['all', '文章（装飾つき）も画像も貼れた'],
+  ['decorated', '文章は装飾つきで貼れた（画像はなし）'],
+  ['textonly', '文字は貼れたが、装飾が消えた'],
+  ['imageonly', '画像だけ貼れた（文章はなし）'],
+  ['fail', '何も貼り付けられなかった'],
 ];
+// iPadOS 26 / Safari 26.5 での検証結果（2026-10-21、ユーザーによる記録）
+const VERIFIED = {
+  'html-dataurl': ['ng', 'iPad検証：noteに貼り付けできず'],
+  'html-bloburl': ['ng', 'iPad検証：noteに貼り付けできず'],
+  'html-https': ['ng', 'iPad検証：noteに貼り付けできず'],
+  'html-none': ['ok', 'iPad検証：見出し・太字・リンクが残った'],
+  png: ['ok', 'iPad検証：画像として貼れた'],
+  legacy: ['ng', 'iPad検証：noteに貼り付けできず'],
+  manual: ['ng', 'iPad検証：noteに貼り付けできず'],
+};
 const ELEMENTS = ['見出し', '太字', '箇条書き', '番号付きリスト', '画像', 'リンク', '引用'];
 
 function build(mode) {
@@ -59,7 +70,7 @@ const METHODS = [
   {
     id: 'html-none',
     title: '④ HTMLのみ（画像は目印）',
-    desc: '画像を含めず、画像の位置に「［ここに画像：…］」という目印を入れます。文章の装飾だけを確認したいとき、または画像を後からnoteで挿入するときに使います。',
+    desc: '画像を含めず、画像の位置に「［画像1：…］」という目印を入れます。文章の装飾だけを確認したいとき、または画像を後からnoteで挿入するときに使います。',
     run() {
       const c = articleCopy('none');
       return copyRich(c.html, c.text).then((r) => [r, { stats: c.art.stats, imageMode: IMAGE_MODES.none.short, htmlBytes: c.htmlBytes }]);
@@ -71,7 +82,7 @@ const METHODS = [
     desc: 'テスト画像のデータをPNG形式でクリップボードに入れます。文章は含みません。noteの本文に貼り付けて、画像として取り込まれるか確認します。',
     run() {
       const item = store.get('sample');
-      if (!item) return Promise.resolve([{ ok: false, method: 'clipboard.write（image/png）', types: ['image/png'], at: new Date().toISOString(), error: { name: 'NotReady', message: 'テスト画像の読み込みが終わっていません' } }, {}]);
+      if (!item) return Promise.resolve([notReady(), {}]);
       return writeClipboard({ 'image/png': toPngBlob(item.blob) }, 'clipboard.write（image/png）').then((r) => [r, { label: 'テスト画像（PNG）' }]);
     },
   },
@@ -98,7 +109,39 @@ const METHODS = [
       return null;
     },
   },
+  {
+    id: 'html-png-one',
+    title: '⑧ 文章＋画像を同時に（1アイテム）',
+    desc: '1つのクリップボード項目に、画像なしの文章（text/html・text/plain）と画像データ（image/png）を同時に入れます。noteが両方を読むか、どちらか片方だけを読むかを確認します。',
+    run() {
+      const item = store.get('sample');
+      const c = articleCopy('none');
+      if (!item) return Promise.resolve([notReady(), {}]);
+      return writeClipboard({ 'text/html': c.html, 'text/plain': c.text, 'image/png': toPngBlob(item.blob) }, 'clipboard.write（HTML＋PNG・1アイテム）').then((r) => [
+        r,
+        { stats: c.art.stats, imageMode: '目印＋PNG同時', htmlBytes: c.htmlBytes, notes: ['ブラウザがこの組み合わせを受け付けない場合は「失敗」になります。'] },
+      ]);
+    },
+  },
+  {
+    id: 'html-png-multi',
+    title: '⑨ 文章と画像を別アイテムで同時に',
+    desc: '文章（text/html・text/plain）の項目と、画像（image/png）の項目を、1回の書き込みで2つ入れます。対応していないブラウザでは失敗します。',
+    run() {
+      const item = store.get('sample');
+      const c = articleCopy('none');
+      if (!item) return Promise.resolve([notReady(), {}]);
+      return writeClipboardItems([{ 'text/html': c.html, 'text/plain': c.text }, { 'image/png': toPngBlob(item.blob) }], 'clipboard.write（2アイテム）').then((r) => [
+        r,
+        { stats: c.art.stats, imageMode: '目印＋PNG別アイテム', htmlBytes: c.htmlBytes },
+      ]);
+    },
+  },
 ];
+
+function notReady() {
+  return { ok: false, method: 'clipboard.write', types: [], at: new Date().toISOString(), error: { name: 'NotReady', message: 'テスト画像の読み込みが終わっていません。少し待ってからもう一度押してください' } };
+}
 
 // ---------- 記録 ----------
 
@@ -198,7 +241,7 @@ function methodCard(m) {
         }
         p.then(([r, info]) => {
           last = r;
-          showCopyResult(resultBox, r, info);
+          showCopyResult(resultBox, r, { failHint: 'この端末（ブラウザ）では、この方式でコピーできませんでした。エラー内容を確認してください。', ...info });
         });
       },
     },
@@ -221,7 +264,7 @@ function methodCard(m) {
           copy: m.manual ? '手動' : last == null ? '未実行' : last.ok ? '成功' : '失敗',
           copyError: last && last.error ? `${last.error.name}: ${last.error.message}` : '',
           noteResult,
-          noteResultLabel: NOTE_RESULTS.find(([v]) => v === noteResult)[1],
+          noteResultLabel: noteResult ? NOTE_RESULTS.find(([v]) => v === noteResult)[1] : '未確認',
           kept: checks.filter((c) => c.input.checked).map((c) => c.name),
           memo: memo.value.trim(),
           options: { ...opt },
@@ -246,6 +289,7 @@ function methodCard(m) {
     'article',
     { class: 'method' },
     h('h3', {}, m.title),
+    VERIFIED[m.id] ? h('span', { class: `verified ${VERIFIED[m.id][0]}` }, VERIFIED[m.id][1]) : h('span', { class: 'verified' }, '未検証'),
     h('p', { class: 'hint' }, m.desc),
     runBtn,
     resultBox,

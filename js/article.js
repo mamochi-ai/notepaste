@@ -3,11 +3,16 @@
 import { renderMarkdown, escapeHtml } from './markdown.js';
 
 export const IMAGE_MODES = {
+  none: { label: '画像なし（位置の目印のみ）', short: '画像なし（目印）' },
   dataurl: { label: 'data URL埋め込み', short: 'data URL' },
   bloburl: { label: 'Blob URL（比較用）', short: 'Blob URL' },
   https: { label: '公開HTTPS URL', short: 'HTTPS URL' },
-  none: { label: '画像なし（位置の目印のみ）', short: '画像なし' },
 };
+
+/** 画像の位置の目印。番号は記事中の画像の出現順（1から） */
+export function imageMarker(n, label) {
+  return `［画像${n}：${label}］`;
+}
 
 /**
  * @param {string} md
@@ -21,7 +26,7 @@ export function buildArticle(md, store, opt) {
     const label = alt || '画像';
     if (opt.mode === 'none') {
       stats.placeholders++;
-      return { placeholder: `［ここに画像：${label}］` };
+      return { placeholder: imageMarker(stats.images, label) };
     }
     if (!src.startsWith('img:')) {
       stats.embedded++;
@@ -51,7 +56,7 @@ export function buildArticle(md, store, opt) {
           return { src: item.publicUrl, ...size };
         }
         stats.placeholders++;
-        return { placeholder: `［ここに画像：${label}（公開URLがないため省略）］` };
+        return { placeholder: imageMarker(stats.images, `${label}（公開URLがないため省略）`) };
       default:
         return null;
     }

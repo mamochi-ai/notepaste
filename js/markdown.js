@@ -66,7 +66,7 @@ function unescapeMd(s) {
  *   サニタイズ済みの画像指定（img:ID / https / data）を、実際に出力する src に変換する。
  * @param {boolean} [opts.extractTitle] 先頭のH1を本文から外し、title として返す
  * @param {boolean} [opts.noteHeadings] noteの「大見出し(h2)/小見出し(h3)」に合わせて見出しを変換する
- * @returns {{html:string, title:string|null, blocks:Array<{type:'block'|'figure', html:string, imageRef?:string}>, imageRefs:string[]}}
+ * @returns {{html:string, title:string|null, blocks:Array<{type:'block'|'figure', html:string, imageRef?:string}>, imageRefs:string[], images:Array<{src:string, alt:string}>}}
  */
 export function renderMarkdown(md, opts = {}) {
   return new Renderer(opts).render(md);
@@ -77,6 +77,7 @@ class Renderer {
     this.opts = opts;
     this.resolveImage = opts.resolveImage || defaultResolveImage;
     this.imageRefs = [];
+    this.images = [];
     this.title = null;
     this.depth = 0;
   }
@@ -92,6 +93,7 @@ class Renderer {
       title: this.title,
       blocks,
       imageRefs: this.imageRefs,
+      images: this.images,
     };
   }
 
@@ -348,6 +350,7 @@ class Renderer {
     const safe = sanitizeImageSrc(rawSrc);
     if (!safe) return { placeholder: `［画像：${alt || '無題'}（許可されていない画像指定のため表示しません）］`, ref: null };
     this.imageRefs.push(safe);
+    this.images.push({ src: safe, alt });
     const res = this.resolveImage(safe, alt);
     if (!res || res.placeholder || !res.src) {
       return { placeholder: (res && res.placeholder) || `［画像：${alt || safe}］`, ref: safe };

@@ -65,17 +65,40 @@
         <label class="field">
           <span>画像の扱い</span>
           <select id="imageMode">
-            <option value="dataurl">data URLで埋め込む</option>
-            <option value="https">公開HTTPS URL（テスト画像のみ）</option>
-            <option value="bloburl">Blob URL（比較用）</option>
-            <option value="none">画像を入れず目印にする</option>
+            <option value="none">画像は目印にして後から貼る（おすすめ）</option>
+            <option value="dataurl">検証用：data URLで埋め込む</option>
+            <option value="https">検証用：公開HTTPS URL（テスト画像のみ）</option>
+            <option value="bloburl">検証用：Blob URL</option>
           </select>
         </label>
+        <p class="hint" id="modeHint" hidden>iPad Safari＋noteの検証では、画像を含むHTMLは貼り付けできませんでした。通常は「目印にして後から貼る」を使ってください。</p>
         <label class="check"><input type="checkbox" id="extractTitle" checked> 最初のH1を記事タイトルとして分ける</label>
         <label class="check"><input type="checkbox" id="noteHeadings" checked> 見出しをnoteの大見出し・小見出しに合わせる</label>
       </div>
       <button type="button" class="btn wide" id="copyTitle" hidden>タイトルだけコピー</button>
       <div id="copyResult" class="result" hidden aria-live="polite"></div>
+
+      <section class="image-steps" id="imageSteps" hidden aria-labelledby="stepsTitle">
+        <div class="section-head">
+          <h3 id="stepsTitle">画像を順番に貼る</h3>
+          <span class="muted" id="stepCount"></span>
+        </div>
+        <p class="hint">本文を貼り付けたあと、ボタンで画像を1枚ずつコピーし、noteの「［画像1：…］」などの目印の位置に貼り付けてください。貼り付けたら目印の文字は消してください。</p>
+        <p class="step-done" id="stepDone" hidden role="status"></p>
+        <div class="step-card">
+          <img id="stepThumb" alt="" width="64" height="64" hidden>
+          <div class="step-info">
+            <strong id="stepLabel"></strong>
+            <span class="muted" id="stepNote"></span>
+          </div>
+        </div>
+        <button type="button" class="btn-secondary" id="stepCopy">画像1をコピー</button>
+        <div class="btn-row">
+          <button type="button" class="btn small" id="stepPrev">前の画像</button>
+          <button type="button" class="btn small" id="stepNext">次の画像</button>
+          <button type="button" class="btn small" id="stepReset">最初から</button>
+        </div>
+      </section>
 
       <details class="fallback">
         <summary>うまくいかない場合</summary>
