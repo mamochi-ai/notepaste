@@ -1,9 +1,9 @@
-import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610211221';
-import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610211221';
-import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610211221';
-import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610211221';
+import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610211233';
+import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610211233';
+import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610211233';
+import { ArticleStore, articleTitle, imageIdsOf } from './articles.js?v=202610211233';
+import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610211233';
 
-const DRAFT_KEY = 'nps-draft';
 const SETTINGS_KEY = 'nps-settings-v2';
 const MEMORY_WARN_BYTES = 40 * 1024 * 1024;
 const SAMPLE_REF = 'img:sample';
@@ -37,6 +37,7 @@ const els = {
 };
 
 const store = new ImageStore();
+const articles = new ArticleStore(SAMPLE_MD);
 const settings = Object.assign({ extractTitle: true, noteHeadings: true, tableAsList: true, toc: 'marker' }, storageGet(SETTINGS_KEY, {}));
 let caret = null; // 入力欄で最後にタップ・入力した位置
 let current = null; // 直近のプレビュー結果
@@ -70,9 +71,13 @@ function onEdit() {
   renderTimer = setTimeout(render, 120);
   clearTimeout(saveTimer);
   els.saveState.textContent = '';
-  saveTimer = setTimeout(() => {
-    els.saveState.textContent = storageSet(DRAFT_KEY, els.md.value) ? '自動保存しました' : '自動保存できませんでした（プライベートブラウズ等）';
-  }, 500);
+  saveTimer = setTimeout(saveNow, 500);
+}
+
+function saveNow() {
+  clearTimeout(saveTimer);
+  const ok = articles.update(els.md.value);
+  els.saveState.textContent = ok ? '自動保存しました' : '保存できませんでした（プライベートブラウズ、または容量不足）';
 }
 
 function markCopied() {
@@ -83,11 +88,36 @@ function markCopied() {
 
 // ---------- 入力 ----------
 
-function setArticle(text) {
-  els.md.value = text;
+function showArticle(a) {
+  els.md.value = a.md;
   caret = null;
   step = 0;
-  onEdit();
+  copied.clear();
+  els.result.hidden = true;
+  els.saveState.textContent = '';
+  render();
+  ensureSampleImage();
+}
+
+// サンプル記事のテスト画像は、記事で使っているときだけ読み込む
+async function ensureSampleImage() {
+  if (!els.md.value.includes(`(${SAMPLE_REF})`) || store.get('sample')) return;
+  try {
+    await store.addBuiltin('sample', 'assets/test-image.png', 'テスト画像');
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+function openArticle(id) {
+  saveNow();
+  const a = articles.open(id);
+  if (a) showArticle(a);
+}
+
+function createArticle(md = '') {
+  saveNow();
+  showArticle(articles.create(md));
 }
 
 function onPasteFromClipboard() {
@@ -100,10 +130,19 @@ function onPasteFromClipboard() {
   navigator.clipboard.readText().then(
     (text) => {
       if (!text.trim()) return toast('クリップボードに文字がありません');
+      const md = text.replace(/\r\n?/g, '\n');
       const v = els.md.value.trim();
-      if (v && v !== SAMPLE_MD.trim() && !confirm('入力中の記事を、クリップボードの内容に置き換えますか？')) return;
-      setArticle(text.replace(/\r\n?/g, '\n'));
-      toast('貼り付けました');
+      // 今の記事が空（またはサンプルのまま）なら置き換え、そうでなければ新しい記事として追加する
+      if (!v || v === SAMPLE_MD.trim()) {
+        els.md.value = md;
+        caret = null;
+        step = 0;
+        onEdit();
+        toast('貼り付けました');
+      } else {
+        createArticle(md);
+        toast('新しい記事として追加しました（前の記事は「記事一覧」にあります）');
+      }
     },
     () => {
       els.md.focus();
@@ -112,16 +151,76 @@ function onPasteFromClipboard() {
   );
 }
 
-async function onNewArticle() {
-  const userImages = store.list().filter((it) => !it.builtin);
-  if (els.md.value.trim() || userImages.length) {
-    const msg = userImages.length ? '記事と、追加した画像をすべて消して新しく始めますか？' : '記事を消して新しく始めますか？';
-    if (!confirm(msg)) return;
-  }
-  for (const it of userImages) await store.remove(it.id);
-  setArticle('');
-  els.result.hidden = true;
+function onNewArticle() {
+  if (els.md.value.trim()) createArticle('');
+  closeArticleList();
   els.md.focus();
+}
+
+// ---------- 記事一覧 ----------
+
+const dialog = $('articlesDialog');
+
+function fmtDate(t) {
+  const d = new Date(t);
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  return sameDay ? `今日 ${d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}` : d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+}
+
+function renderArticleList() {
+  const list = articles.sorted();
+  $('articleCount').textContent = `${list.length}件`;
+  $('articleList').replaceChildren(
+    ...list.map((a) => {
+      const isCur = a.id === articles.currentId;
+      const imgs = imageIdsOf(a.md).size;
+      return h(
+        'li',
+        { class: `article-item${isCur ? ' is-current' : ''}` },
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'article-open',
+            onclick: () => {
+              if (!isCur) openArticle(a.id);
+              closeArticleList();
+            },
+          },
+          h('strong', { class: 'ellipsis' }, articleTitle(a.md)),
+          h('span', { class: 'muted' }, `${fmtDate(a.updatedAt)} 更新・${a.md.length.toLocaleString()}文字${imgs ? `・画像${imgs}枚` : ''}${isCur ? '・編集中' : ''}`),
+        ),
+        h('button', { type: 'button', class: 'btn small danger', 'aria-label': `「${articleTitle(a.md)}」を削除`, onclick: () => deleteArticle(a.id) }, '削除'),
+      );
+    }),
+  );
+}
+
+async function deleteArticle(id) {
+  const a = articles.list.find((x) => x.id === id);
+  if (!a || !confirm(`「${articleTitle(a.md)}」を削除しますか？\nこの記事だけで使っている画像も削除されます。元に戻せません。`)) return;
+  saveNow();
+  const wasCurrent = id === articles.currentId;
+  articles.remove(id);
+  // どの記事からも使われなくなった画像を消す
+  const used = articles.usedImageIds();
+  for (const it of store.list()) if (!it.builtin && !used.has(it.id)) await store.remove(it.id);
+  if (wasCurrent) showArticle(articles.current);
+  renderArticleList();
+  toast('削除しました');
+}
+
+function openArticleList() {
+  saveNow();
+  renderArticleList();
+  if (typeof dialog.showModal === 'function') dialog.showModal();
+  else dialog.setAttribute('open', '');
+}
+
+function closeArticleList() {
+  if (typeof dialog.close === 'function' && dialog.open) dialog.close();
+  else dialog.removeAttribute('open');
 }
 
 // ---------- 画像 ----------
@@ -165,8 +264,9 @@ async function addFiles(files) {
 
 function renderImageList() {
   const used = new Set((current?.imageRefs || []).filter((r) => r.startsWith('img:')).map((r) => r.slice(4)));
-  // テスト画像はサンプル記事で使っているときだけ表示する
-  const items = store.list().filter((it) => !it.builtin || used.has(it.id));
+  // この記事で使っている画像と、どの記事でも使っていない画像だけを表示する（テスト画像は使っているときだけ）
+  const usedAnywhere = articles.usedImageIds();
+  const items = store.list().filter((it) => used.has(it.id) || (!it.builtin && !usedAnywhere.has(it.id)));
   const total = store.totalBytes();
   els.imagesSection.hidden = items.length === 0;
   els.imageSummary.textContent = `${items.length}枚・${formatBytes(total)}${total > MEMORY_WARN_BYTES ? '（多めです。不要な画像は削除してください）' : ''}`;
@@ -350,8 +450,9 @@ async function main() {
   initTheme();
   bindSettings();
   bindHelp();
-  els.md.value = storageGet(DRAFT_KEY, null) ?? SAMPLE_MD;
+  els.md.value = articles.current.md;
   render();
+  if (!articles.lastSaveOk) els.saveState.textContent = '保存できない環境です（プライベートブラウズ等）';
 
   const trackCaret = () => (caret = els.md.selectionEnd);
   for (const ev of ['keyup', 'click', 'select', 'input', 'blur']) els.md.addEventListener(ev, trackCaret);
@@ -364,6 +465,14 @@ async function main() {
   });
   $('pasteFromClipboard').addEventListener('click', onPasteFromClipboard);
   $('newArticle').addEventListener('click', onNewArticle);
+  $('openArticles').addEventListener('click', openArticleList);
+  $('closeArticles').addEventListener('click', closeArticleList);
+  $('newFromList').addEventListener('click', onNewArticle);
+  // 背景をタップしたら閉じる
+  dialog.addEventListener('click', (e) => e.target === dialog && closeArticleList());
+  // 別のアプリに切り替えるときは、待たずに保存する
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && saveNow());
+  window.addEventListener('pagehide', saveNow);
   $('copyTitle').addEventListener('click', onCopyTitle);
   $('copyRich').addEventListener('click', onCopyRich);
   $('copyPlain').addEventListener('click', onCopyPlain);
@@ -389,14 +498,7 @@ async function main() {
 
   store.onChange(render);
   await store.init();
-  // サンプル記事のテスト画像は、記事で使っているときだけ読み込む
-  if (els.md.value.includes(`(${SAMPLE_REF})`)) {
-    try {
-      await store.addBuiltin('sample', 'assets/test-image.png', 'テスト画像');
-    } catch (e) {
-      toast(e.message);
-    }
-  }
+  await ensureSampleImage();
 }
 
 main();
