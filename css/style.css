@@ -832,3 +832,56 @@ details[open] > summary::before { transform: rotate(45deg); }
 
 .toc-field { padding: 2px 2px 0; }
 .toc-hint { margin: -4px 2px 0; font-size: 0.8rem; }
+
+/* ---------- 記事一覧 ---------- */
+
+.sheet {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(80vh, 720px);
+  max-height: min(80dvh, 720px);
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  overflow: auto;
+}
+.sheet[open] { display: grid; gap: 12px; align-content: start; }
+.sheet::backdrop { background: rgba(20, 22, 20, 0.45); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sheet-head h2 { margin: 0; font-size: 1.05rem; }
+.sheet-head .muted { font-size: 0.85rem; font-weight: 400; }
+.sheet .btn-primary { min-height: 52px; font-size: 1rem; }
+.sheet .hint { margin: 0; }
+
+.article-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.article-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.article-item.is-current { border-color: var(--accent); background: var(--accent-soft); }
+.article-open {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  min-height: 56px;
+  padding: 8px 10px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.article-open .muted { font-size: 0.8rem; }
+
+.pane-input .pane-head { flex-direction: column; align-items: stretch; }
+.pane-input .toolbar .btn { padding: 0 14px; }

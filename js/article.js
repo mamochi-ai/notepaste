@@ -1,6 +1,6 @@
 // 記事の組み立て：Markdown + 画像の扱い方（モード）から、コピー用HTML・プレーンテキストを作る
 
-import { renderMarkdown, escapeHtml } from './markdown.js?v=202610211221';
+import { renderMarkdown, escapeHtml } from './markdown.js?v=202610211233';
 
 export const IMAGE_MODES = {
   none: { label: '画像なし（位置の目印のみ）', short: '画像なし（目印）' },
