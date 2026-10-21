@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>検証テスト｜note Paste Studio</title>
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<script type="module" src="js/test.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">note Paste Studio</span>
+    <span class="badge">プロトタイプ</span>
+  </div>
+  <nav class="tabs" aria-label="画面切り替え">
+    <a href="./">エディタ</a>
+    <a href="test.html" aria-current="page">検証テスト</a>
+  </nav>
+  <button type="button" class="btn-ghost theme-btn" id="themeToggle"><span>自動</span></button>
+</header>
+
+<main class="testpage">
+  <section class="card intro">
+    <h1>コピー＆貼り付けの検証</h1>
+    <p>サンプル記事をいくつかの方式でクリップボードにコピーし、noteの編集画面に貼り付けた結果を記録するための画面です。</p>
+    <ul class="pill-list">
+      <li><strong>コピーの成功</strong>：このブラウザがクリップボードへの書き込みを受け付けたこと。</li>
+      <li><strong>noteでの成功</strong>：noteに貼り付けたとき、見出し・太字・画像などが残ったこと。<br>こちらは自動では判定できません。実際に貼り付けて、下の欄に記録してください。</li>
+    </ul>
+  </section>
+
+  <section class="card" aria-labelledby="envTitle">
+    <h2 id="envTitle">この端末の対応状況</h2>
+    <p class="hint">ブラウザが提供している機能の有無です。「あり」でも、実際の動作は端末やOSのバージョンで変わることがあります。</p>
+    <dl class="env" id="envList"></dl>
+  </section>
+
+  <section class="card" aria-labelledby="sampleTitle">
+    <h2 id="sampleTitle">サンプル記事</h2>
+    <div class="options inline">
+      <label class="check"><input type="checkbox" id="extractTitle" checked> 最初のH1を記事タイトルとして分ける</label>
+      <label class="check"><input type="checkbox" id="noteHeadings" checked> 見出しをnoteの大見出し・小見出しに合わせる</label>
+    </div>
+    <div class="sample-grid">
+      <article class="paper compact" aria-label="サンプル記事のプレビュー">
+        <p class="paper-label">プレビュー</p>
+        <h1 class="paper-title" id="previewTitle" hidden></h1>
+        <div class="paper-body" id="previewBody"></div>
+      </article>
+      <div>
+        <button type="button" class="btn wide" id="copyTitle">タイトルだけコピー</button>
+        <details class="source">
+          <summary>Markdownを見る</summary>
+          <pre id="sampleSource"></pre>
+        </details>
+        <div class="explain">
+          <h3>「画像の埋め込み」と「画像そのもの」の違い</h3>
+          <p><strong>①〜④・⑥</strong>は、文章（HTML）の中に画像の<em>場所</em>を書き込む方式です。画像が表示されるかは、貼り付け先がその場所（data URL・Blob URL・HTTPS URL）を読み込むかどうかで決まります。</p>
+          <p><strong>⑤</strong>は、画像の<em>データそのもの</em>（PNG）をクリップボードに入れる方式です。文章とは同時に入れられないため、画像ごとに貼り付けます。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="methodsTitle">
+    <h2 id="methodsTitle">コピー方式ごとの検証</h2>
+    <p class="hint">「コピー」をタップ → noteの編集画面で貼り付け → このページに戻って結果を記録、の順に進めてください。記録はこの端末のブラウザ内に保存されます。</p>
+    <div class="methods" id="methods"></div>
+  </section>
+
+  <section class="card" aria-labelledby="pasteTitle">
+    <h2 id="pasteTitle">このページでの貼り付けテスト</h2>
+    <p class="callout">ここでの結果は「クリップボードに何が入ったか」の確認用です。<strong>このページで成功しても、noteで同じ結果になるとは限りません。</strong>noteは貼り付けられたHTMLを独自のルールで整形・削除します。</p>
+    <div class="paste-wrap">
+      <div class="paste-area paper-body" id="pasteArea" contenteditable="true" role="textbox" aria-multiline="true" aria-label="貼り付けテスト領域" data-placeholder="ここを長押しして「ペースト」"></div>
+      <div class="btn-row">
+        <button type="button" class="btn" id="clearPaste">貼り付け領域を空にする</button>
+      </div>
+      <div class="paste-info" id="pasteInfo" aria-live="polite">
+        <p class="muted">貼り付けると、クリップボードに入っていたデータの種類と、残った要素を表示します。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="recordsTitle">
+    <div class="section-head">
+      <h2 id="recordsTitle">記録一覧</h2>
+      <div class="btn-row">
+        <button type="button" class="btn small" id="copyRecords">テキストでコピー</button>
+        <button type="button" class="btn small" id="downloadRecords">JSONを保存</button>
+        <button type="button" class="btn small danger" id="clearRecords">すべて削除</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="records">
+        <thead><tr><th>日時</th><th>方式</th><th>コピー</th><th>noteでの結果</th><th>残った要素</th><th>メモ</th><th>環境</th><th></th></tr></thead>
+        <tbody id="recordRows"></tbody>
+      </table>
+    </div>
+    <p class="muted" id="recordsEmpty">まだ記録がありません。</p>
+  </section>
+</main>
+
+<footer class="footer">
+  <p>記事データと画像はこのブラウザの中だけで処理され、外部サーバーへは送信されません。note公式のツールではありません。</p>
+</footer>
+</body>
+</html>

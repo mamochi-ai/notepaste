@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Markdown記事を装飾付きのままnoteへ貼り付けるための検証ツール（プロトタイプ）">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>note Paste Studio</title>
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<script type="module" src="js/editor.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">note Paste Studio</span>
+    <span class="badge">プロトタイプ</span>
+  </div>
+  <nav class="tabs" aria-label="画面切り替え">
+    <a href="./" aria-current="page">エディタ</a>
+    <a href="test.html">検証テスト</a>
+  </nav>
+  <button type="button" class="btn-ghost theme-btn" id="themeToggle"><span>自動</span></button>
+</header>
+
+<main class="workspace">
+  <section class="pane pane-input" aria-labelledby="inputTitle">
+    <div class="pane-head">
+      <h2 id="inputTitle">Markdown</h2>
+      <div class="toolbar">
+        <label class="btn" for="fileInput">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z M4 15l4-4 4 4 3-3 5 5" /><circle cx="15.5" cy="9" r="1.5" /></svg>
+          画像を追加
+        </label>
+        <input type="file" id="fileInput" accept="image/*" multiple class="visually-hidden">
+        <button type="button" class="btn" id="loadSample">サンプル</button>
+        <button type="button" class="btn" id="clearText">消去</button>
+      </div>
+    </div>
+    <p class="hint">ChatGPTやClaudeの回答を「コピー」して、ここに貼り付けてください。画像は、入力欄でタップした位置に挿入されます。</p>
+    <textarea id="md" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Markdown入力欄"></textarea>
+    <div class="statusline"><span id="charCount">0 文字</span><span id="saveState"></span></div>
+
+    <section class="images" aria-labelledby="imagesTitle">
+      <div class="section-head">
+        <h3 id="imagesTitle">画像</h3>
+        <span class="muted" id="imageSummary"></span>
+      </div>
+      <p class="hint">画像はこの端末のブラウザ内にだけ保存され、外部には送信されません。長辺1600pxを超える画像は縮小します。</p>
+      <ul class="image-list" id="imageList"></ul>
+    </section>
+  </section>
+
+  <section class="pane pane-output" aria-labelledby="outputTitle">
+    <div class="copy-panel">
+      <h2 id="outputTitle" class="visually-hidden">コピーとプレビュー</h2>
+      <button type="button" class="btn-primary" id="copyRich">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></svg>
+        装飾付きコピー
+      </button>
+      <div class="options">
+        <label class="field">
+          <span>画像の扱い</span>
+          <select id="imageMode">
+            <option value="dataurl">data URLで埋め込む</option>
+            <option value="https">公開HTTPS URL（テスト画像のみ）</option>
+            <option value="bloburl">Blob URL（比較用）</option>
+            <option value="none">画像を入れず目印にする</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="extractTitle" checked> 最初のH1を記事タイトルとして分ける</label>
+        <label class="check"><input type="checkbox" id="noteHeadings" checked> 見出しをnoteの大見出し・小見出しに合わせる</label>
+      </div>
+      <button type="button" class="btn wide" id="copyTitle" hidden>タイトルだけコピー</button>
+      <div id="copyResult" class="result" hidden aria-live="polite"></div>
+
+      <details class="fallback">
+        <summary>うまくいかない場合</summary>
+        <div class="fallback-body">
+          <div class="btn-row">
+            <button type="button" class="btn" id="selectAll">記事全体を選択</button>
+            <button type="button" class="btn" id="copyPlain">プレーンテキストをコピー</button>
+            <button type="button" class="btn" id="downloadHtml">HTMLファイルを保存</button>
+          </div>
+          <ol class="steps">
+            <li>「記事全体を選択」をタップすると、プレビューの本文が選択されます。</li>
+            <li>選択範囲をタップし、表示されるメニューから「コピー」を選びます。</li>
+            <li>noteの編集画面の本文欄を長押しし、「ペースト」を選びます。</li>
+          </ol>
+          <p class="hint">それでも装飾が残らない場合は、下の「分割コピー」で文章と画像を1つずつ貼り付ける方法があります。</p>
+        </div>
+      </details>
+    </div>
+
+    <article class="paper" aria-label="プレビュー">
+      <p class="paper-label">プレビュー</p>
+      <h1 class="paper-title" id="previewTitle" hidden></h1>
+      <div class="paper-body" id="previewBody"></div>
+    </article>
+
+    <details class="split">
+      <summary>分割コピー（文章と画像を順番に貼り付ける）</summary>
+      <p class="hint">noteが画像付きHTMLを受け付けない場合の代替手段です。上から順に「コピー」→ noteで「ペースト」を繰り返します。画像はPNG画像そのもの（バイナリ）としてコピーします。</p>
+      <ol class="segments" id="segments"></ol>
+    </details>
+  </section>
+</main>
+
+<footer class="footer">
+  <p>記事データと画像はこのブラウザの中だけで処理され、外部サーバーへは送信されません。note公式のツールではありません。</p>
+</footer>
+</body>
+</html>
