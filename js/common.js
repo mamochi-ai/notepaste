@@ -131,6 +131,11 @@ export function showCopyResult(box, r, info = {}) {
       h('span', { class: 'result-time' }, fmtTime(r.at)),
     ),
   );
+  if (r.ok && info.compact) {
+    box.firstChild.querySelector('strong').textContent = 'コピーしました';
+    box.append(h('p', { class: 'result-note' }, info.message || ''));
+    return;
+  }
   box.append(
     h(
       'p',
