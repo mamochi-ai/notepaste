@@ -101,3 +101,22 @@ test('深い入れ子や長い入力でも停止する', () => {
   const long = '**a'.repeat(5000);
   assert.ok(md(long).length > 0);
 });
+
+test('表を箇条書きに変換', () => {
+  const t = '| 項目 | 前 | 後 |\n|---|---|---|\n| 記事 | 1本 | 9本 |\n| **時間** | 2h | 40m |';
+  assert.equal(md(t, { tableAsList: true }), '<ul><li><strong>記事</strong>：前 1本／後 9本</li><li><strong><strong>時間</strong></strong>：前 2h／後 40m</li></ul>');
+  assert.equal(md('| 名前 | 値 |\n|---|---|\n| a | 1 |', { tableAsList: true }), '<ul><li><strong>a</strong>：1</li></ul>');
+});
+
+test('目次', () => {
+  const src = '# 題\n\n導入\n\n## A\n\n### A1\n\n### A2\n\n## B\n\n> ## 引用内は対象外';
+  const o = { extractTitle: true, noteHeadings: true };
+  const list = renderMarkdown(src, { ...o, toc: 'list' });
+  assert.equal(list.blocks[1].html, '<p><strong>目次</strong></p>\n<ul><li>A<ul><li>A1</li><li>A2</li></ul></li><li>B</li></ul>');
+  assert.equal(list.blocks[0].html, '<p>導入</p>');
+  const marker = renderMarkdown(src, { ...o, toc: 'marker' });
+  assert.match(marker.blocks[1].html, /目次/);
+  assert.equal(renderMarkdown('本文だけ', { toc: 'list' }).html, '<p>本文だけ</p>');
+  // 小見出しから始まる場合
+  assert.equal(renderMarkdown('### x\n\n## y', { toc: 'list' }).blocks[0].html, '<p><strong>目次</strong></p>\n<ul><li><ul><li>x</li></ul></li><li>y</li></ul>');
+});

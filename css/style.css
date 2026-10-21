@@ -829,3 +829,6 @@ details[open] > summary::before { transform: rotate(45deg); }
   .mobile-bar .btn-primary.is-done::after { content: "✓"; }
   .toast { bottom: calc(92px + env(safe-area-inset-bottom)); }
 }
+
+.toc-field { padding: 2px 2px 0; }
+.toc-hint { margin: -4px 2px 0; font-size: 0.8rem; }
