@@ -1,7 +1,7 @@
-import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js';
-import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js';
-import { ImageStore, toPngBlob, formatBytes } from './images.js';
-import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js';
+import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610211208';
+import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610211208';
+import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610211208';
+import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610211208';
 
 const DRAFT_KEY = 'nps-draft';
 const SETTINGS_KEY = 'nps-settings-v2';
