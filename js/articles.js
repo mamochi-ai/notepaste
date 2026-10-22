@@ -1,6 +1,6 @@
 // 複数の記事の保存（localStorage）。画像は images.js（IndexedDB）に別保存し、本文中の img:ID で参照する。
 
-import { storageGet, storageSet } from './common.js?v=202610221053';
+import { storageGet, storageSet } from './common.js?v=202610221118';
 
 const ARTICLES_KEY = 'nps-articles';
 const CURRENT_KEY = 'nps-current';
