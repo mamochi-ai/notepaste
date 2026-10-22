@@ -16,8 +16,8 @@
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="css/style.css?v=202610211236">
-<script type="module" src="js/editor.js?v=202610211236"></script>
+<link rel="stylesheet" href="css/style.css?v=202610221053">
+<script type="module" src="js/editor.js?v=202610221053"></script>
 </head>
 <body class="editor-page">
 <header class="topbar">
@@ -33,7 +33,7 @@
 
 <section class="help" id="help" hidden aria-label="使い方">
   <ol>
-    <li><strong>貼り付け</strong>：ChatGPTやClaudeの回答をコピーして、「AIの回答を貼り付け」を押します（または入力欄に直接貼り付け）。書きかけの記事があるときは、新しい記事として追加されます。過去の記事は「記事一覧」から開けます。</li>
+    <li><strong>貼り付け</strong>：ChatGPTやClaudeに記事を頼むときは「AIへの依頼文」を添えてください。回答をコピーボタンでコピーして、「AIの回答を貼り付け」を押します（または入力欄に直接貼り付け）。書きかけの記事があるときは、新しい記事として追加されます。過去の記事は「記事一覧」から開けます。</li>
     <li><strong>画像を入れる</strong>：入力欄で画像を入れたい位置をタップし、「画像を追加」を押します。</li>
     <li><strong>noteへ</strong>：「noteに貼り付ける」の①〜③の順にコピーして、noteの編集画面に貼り付けます。<br>本文の「［画像1：…］」の目印の位置に、画像を1枚ずつ貼り付けて、目印の文字を消してください。</li>
   </ol>
@@ -43,7 +43,10 @@
 <main class="workspace">
   <section class="pane pane-input" aria-labelledby="inputTitle">
     <div class="pane-head">
-      <h2 id="inputTitle">記事</h2>
+      <div class="pane-title-row">
+        <h2 id="inputTitle">記事</h2>
+        <button type="button" class="btn small" id="openPrompts">AIへの依頼文</button>
+      </div>
       <div class="toolbar">
         <button type="button" class="btn" id="pasteFromClipboard">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4.5V3h6v1.5M9 10h6M9 14h6" /></svg>
@@ -174,6 +177,15 @@
     </div>
     <p class="muted backup-status" id="backupStatus"></p>
   </section>
+</dialog>
+
+<dialog class="sheet" id="promptsDialog" aria-labelledby="promptsTitle">
+  <div class="sheet-head">
+    <h2 id="promptsTitle">AIへの依頼文</h2>
+    <button type="button" class="btn small" id="closePrompts">閉じる</button>
+  </div>
+  <p class="hint">ChatGPTやClaudeにこの依頼文を渡すと、見出しや太字がそのまま貼り付けられる形で書いてもらえます。AIの回答は、回答の下やコードブロック右上の<strong>コピーボタン</strong>でコピーしてください（文字を長押しで選んでコピーすると、見出しの記号が消えてしまいます）。</p>
+  <div class="prompt-list" id="promptList"></div>
 </dialog>
 
 <nav class="mobile-bar" aria-label="コピー操作">

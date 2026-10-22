@@ -1,9 +1,10 @@
-import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610211236';
-import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610211236';
-import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610211236';
-import { ArticleStore, articleTitle, imageIdsOf } from './articles.js?v=202610211236';
-import { buildBackup, parseBackup } from './backup.js?v=202610211236';
-import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610211236';
+import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610221053';
+import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610221053';
+import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610221053';
+import { ArticleStore, articleTitle, imageIdsOf } from './articles.js?v=202610221053';
+import { buildBackup, parseBackup } from './backup.js?v=202610221053';
+import { PROMPTS, unwrapMarkdownFence } from './prompts.js?v=202610221053';
+import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610221053';
 
 const SETTINGS_KEY = 'nps-settings-v2';
 const MEMORY_WARN_BYTES = 40 * 1024 * 1024;
@@ -131,7 +132,7 @@ function onPasteFromClipboard() {
   navigator.clipboard.readText().then(
     (text) => {
       if (!text.trim()) return toast('クリップボードに文字がありません');
-      const md = text.replace(/\r\n?/g, '\n');
+      const md = unwrapMarkdownFence(text.replace(/\r\n?/g, '\n'));
       const v = els.md.value.trim();
       // 今の記事が空（またはサンプルのまま）なら置き換え、そうでなければ新しい記事として追加する
       if (!v || v === SAMPLE_MD.trim()) {
@@ -156,6 +157,62 @@ function onNewArticle() {
   if (els.md.value.trim()) createArticle('');
   closeArticleList();
   els.md.focus();
+}
+
+// 入力欄への直接の貼り付けでも、```markdown の囲みがあれば外す
+function onTextareaPaste(e) {
+  const text = e.clipboardData && e.clipboardData.getData('text/plain');
+  if (!text) return;
+  const md = unwrapMarkdownFence(text.replace(/\r\n?/g, '\n'));
+  if (md === text) return;
+  e.preventDefault();
+  const ta = els.md;
+  ta.setRangeText(md, ta.selectionStart, ta.selectionEnd, 'end');
+  caret = ta.selectionEnd;
+  onEdit();
+  toast('コードブロックの囲みを外して貼り付けました');
+}
+
+// ---------- AIへの依頼文 ----------
+
+const promptsDialog = $('promptsDialog');
+
+function renderPrompts() {
+  $('promptList').replaceChildren(
+    ...PROMPTS.map((p) =>
+      h(
+        'section',
+        { class: 'prompt-card' },
+        h('h3', {}, p.title),
+        h('p', { class: 'hint' }, p.desc),
+        h('pre', {}, p.text),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'btn-primary',
+            onclick: () =>
+              copyPlain(p.text).then((r) => {
+                if (!r.ok) return toast(`コピーできませんでした：${r.error?.message || ''}`);
+                toast('依頼文をコピーしました。AIへのメッセージに貼り付けてください');
+                closeDialog(promptsDialog);
+              }),
+          },
+          'この依頼文をコピー',
+        ),
+      ),
+    ),
+  );
+}
+
+function openDialog(d) {
+  if (typeof d.showModal === 'function') d.showModal();
+  else d.setAttribute('open', '');
+}
+
+function closeDialog(d) {
+  if (typeof d.close === 'function' && d.open) d.close();
+  else d.removeAttribute('open');
 }
 
 // ---------- 記事一覧 ----------
@@ -272,13 +329,11 @@ function openArticleList() {
   saveNow();
   renderArticleList();
   renderBackupStatus();
-  if (typeof dialog.showModal === 'function') dialog.showModal();
-  else dialog.setAttribute('open', '');
+  openDialog(dialog);
 }
 
 function closeArticleList() {
-  if (typeof dialog.close === 'function' && dialog.open) dialog.close();
-  else dialog.removeAttribute('open');
+  closeDialog(dialog);
 }
 
 // ---------- 画像 ----------
@@ -515,6 +570,7 @@ async function main() {
   const trackCaret = () => (caret = els.md.selectionEnd);
   for (const ev of ['keyup', 'click', 'select', 'input', 'blur']) els.md.addEventListener(ev, trackCaret);
   els.md.addEventListener('input', onEdit);
+  els.md.addEventListener('paste', onTextareaPaste);
 
   els.fileInput.addEventListener('change', async () => {
     const files = [...els.fileInput.files];
@@ -532,8 +588,13 @@ async function main() {
     $('backupInput').value = '';
     if (f) await onRestoreBackup(f);
   });
+  $('openPrompts').addEventListener('click', () => {
+    renderPrompts();
+    openDialog(promptsDialog);
+  });
+  $('closePrompts').addEventListener('click', () => closeDialog(promptsDialog));
   // 背景をタップしたら閉じる
-  dialog.addEventListener('click', (e) => e.target === dialog && closeArticleList());
+  for (const d of [dialog, promptsDialog]) d.addEventListener('click', (e) => e.target === d && closeDialog(d));
   // 別のアプリに切り替えるときは、待たずに保存する
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && saveNow());
   window.addEventListener('pagehide', saveNow);
