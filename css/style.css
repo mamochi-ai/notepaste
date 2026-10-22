@@ -889,3 +889,30 @@ details[open] > summary::before { transform: rotate(45deg); }
 .backup { border-top: 1px solid var(--border); padding-top: 12px; display: grid; gap: 8px; }
 .backup h3 { margin: 0; font-size: 0.95rem; }
 .backup-status { margin: 0; font-size: 0.82rem; }
+
+.pane-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pane-title-row h2 { margin: 0; font-size: 1.05rem; }
+
+.prompt-list { display: grid; gap: 12px; }
+.prompt-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.prompt-card h3 { margin: 0; font-size: 0.95rem; }
+.prompt-card .hint { margin: 0; }
+.prompt-card pre {
+  margin: 0;
+  padding: 10px 12px;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.prompt-card .btn-primary { min-height: 48px; font-size: 0.95rem; }
