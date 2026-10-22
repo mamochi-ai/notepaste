@@ -1,10 +1,10 @@
-import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610221053';
-import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610221053';
-import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610221053';
-import { ArticleStore, articleTitle, imageIdsOf } from './articles.js?v=202610221053';
-import { buildBackup, parseBackup } from './backup.js?v=202610221053';
-import { PROMPTS, unwrapMarkdownFence } from './prompts.js?v=202610221053';
-import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610221053';
+import { buildArticle, clipboardHtml, htmlToText, standaloneHtml } from './article.js?v=202610221118';
+import { copyRich, copyPlain, writeClipboard, selectElement } from './clipboard.js?v=202610221118';
+import { ImageStore, toPngBlob, formatBytes } from './images.js?v=202610221118';
+import { ArticleStore, articleTitle, imageIdsOf } from './articles.js?v=202610221118';
+import { buildBackup, parseBackup } from './backup.js?v=202610221118';
+import { PROMPTS, unwrapMarkdownFence } from './prompts.js?v=202610221118';
+import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp } from './common.js?v=202610221118';
 
 const SETTINGS_KEY = 'nps-settings-v2';
 const MEMORY_WARN_BYTES = 40 * 1024 * 1024;

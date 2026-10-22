@@ -1,7 +1,7 @@
-import { buildArticle, clipboardHtml, htmlToText, IMAGE_MODES } from './article.js?v=202610221053';
-import { copyRich, copyPlain, legacyCopy, writeClipboard, writeClipboardItems, selectElement, clipboardEnv } from './clipboard.js?v=202610221053';
-import { ImageStore, toPngBlob } from './images.js?v=202610221053';
-import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp, bytesOf } from './common.js?v=202610221053';
+import { buildArticle, clipboardHtml, htmlToText, IMAGE_MODES } from './article.js?v=202610221118';
+import { copyRich, copyPlain, legacyCopy, writeClipboard, writeClipboardItems, selectElement, clipboardEnv } from './clipboard.js?v=202610221118';
+import { ImageStore, toPngBlob } from './images.js?v=202610221118';
+import { SAMPLE_MD, initTheme, toast, h, showCopyResult, storageGet, storageSet, download, dateStamp, bytesOf } from './common.js?v=202610221118';
 
 const RECORDS_KEY = 'nps-records';
 const $ = (id) => document.getElementById(id);

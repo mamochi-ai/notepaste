@@ -1,6 +1,6 @@
 // バックアップ（記事と画像を1つのJSONファイルにまとめる）と復元
 
-import { blobToDataUrl } from './images.js?v=202610221053';
+import { blobToDataUrl } from './images.js?v=202610221118';
 
 const FORMAT = 'note-paste-studio-backup';
 const ID_RE = /^[a-z0-9_-]{1,40}$/i;
